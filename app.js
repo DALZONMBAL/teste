@@ -393,7 +393,10 @@ document.getElementById('sendTransferBtn')?.addEventListener('click',async()=>{
   if(error)throw error;
   pendingTransferMfa=null;pendingTransferKey=null;mfaCode.value='';mfaPanel.hidden=true;
   toast('Transfert de test enregistré · '+String(data).slice(0,8));
-  if(currentProfile){const {data:{user}}=await supabaseClient.auth.getUser();if(user)await loadUserData(user);}
+  if(currentProfile){
+   const {data:{user}}=await supabaseClient.auth.getUser();
+   if(user){try{await loadUserData(user);}catch(refreshError){toast('Transfert enregistré. Actualisation des soldes impossible pour le moment.');}}
+  }
  }catch(e){
   pendingTransferMfa=null;mfaPanel.hidden=true;
   toast(e.message||'Transfert refusé par les contrôles de sécurité');
