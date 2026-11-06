@@ -44,8 +44,38 @@ body.dark .transactions{background:#14231b;border-color:#26372c}
 @media(max-width:420px){.app{padding-left:15px;padding-right:15px}.bottom-nav{padding-left:8px;padding-right:8px}.nav-item{font-size:9px;min-width:48px}.nav-item svg{width:20px;height:20px}.amount{font-size:36px}.form-grid{gap:8px}.panel{padding:16px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
+
+<style>
+.welcome-screen{position:fixed;inset:0;z-index:50;background:radial-gradient(circle at 50% 34%,#234832 0,#142b20 38%,#0b1711 78%);color:#f4f8f1;display:flex;flex-direction:column;padding:24px max(22px,calc((100vw - 480px)/2));overflow:auto}
+.welcome-top{display:flex;align-items:center;justify-content:space-between}.welcome-top .brand{color:#fff}.welcome-locale{font-size:10px;letter-spacing:1.3px;color:#b6c7b7}
+.welcome-content{width:100%;max-width:430px;margin:auto;padding:26px 0 18px}
+.welcome-visual{height:235px;position:relative;display:grid;place-items:center;margin-bottom:30px}
+.welcome-orbit{position:absolute;border:1px solid rgba(177,222,151,.22);border-radius:50%;transform:rotate(-23deg)}
+.orbit-one{width:255px;height:160px}.orbit-two{width:210px;height:210px;transform:rotate(35deg)}
+.welcome-symbol{width:112px;height:112px;border-radius:34px;display:grid;place-items:center;background:linear-gradient(145deg,#b7ed8c,#6cae4d);color:#18301f;font:800 64px Manrope;box-shadow:0 18px 70px rgba(138,203,102,.25);transform:rotate(-8deg)}
+.welcome-float{position:absolute;padding:11px 14px;border:1px solid rgba(255,255,255,.13);border-radius:14px;background:rgba(255,255,255,.09);backdrop-filter:blur(14px);font-size:10px;color:#c9d9c8;box-shadow:0 10px 35px #07120c55}
+.welcome-float strong{display:block;font-size:14px;color:#fff;margin-top:4px}.float-one{top:20px;right:0}.float-two{bottom:15px;left:0}
+.welcome-content .eyebrow{color:#a8d78e;font-size:10px;letter-spacing:2px}.welcome-content h1{font:800 clamp(34px,9vw,46px)/1.12 Manrope;letter-spacing:-1.8px;margin:14px 0}.welcome-content h1 span{color:#a8df83}
+.welcome-content>p{font-size:14px;line-height:1.7;color:#bdcdbf;max-width:340px;margin:0 0 25px}
+.welcome-cta{display:flex;align-items:center;justify-content:space-between;padding:17px 20px;border-radius:15px;background:#a8df83;color:#18301f;width:100%;font-weight:800}.welcome-cta span{font-size:21px}
+.welcome-bottom{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:22px;color:#93a895;font-size:10px;letter-spacing:1px}.welcome-bottom i{width:3px;height:3px;border-radius:50%;background:#a8df83}
+.auth-screen{z-index:60}
+@media(max-height:700px){.welcome-visual{height:180px;margin-bottom:16px}.welcome-content{padding:12px 0}.welcome-content h1{font-size:34px}}
+</style>
 </head>
 <body>
+
+<div class="welcome-screen" id="welcomeScreen">
+ <div class="welcome-top"><div class="brand"><span class="brand-mark">T</span>teste</div><span class="welcome-locale">FR · CDF / USD</span></div>
+ <div class="welcome-content">
+  <div class="welcome-visual"><div class="welcome-orbit orbit-one"></div><div class="welcome-orbit orbit-two"></div><div class="welcome-symbol">T</div><div class="welcome-float float-one">USD <strong>$ 2,480</strong></div><div class="welcome-float float-two">CDF <strong>2 850 000</strong></div></div>
+  <div class="eyebrow">VOTRE ARGENT, EN TOUTE SIMPLICITÉ</div>
+  <h1>Le monde avance.<br><span>Votre argent aussi.</span></h1>
+  <p>Une nouvelle façon de gérer vos devises et de suivre vos opérations, où que vous soyez.</p>
+  <button class="primary-btn welcome-cta" id="getStarted">Get started <span>→</span></button>
+  <div class="welcome-bottom"><span>Simple.</span><i></i><span>Clair.</span><i></i><span>Connecté.</span></div>
+ </div>
+</div>
 <div class="app">
 <header class="top"><div class="brand"><span class="brand-mark">T</span>teste</div><div class="top-right"><button class="round-tool" id="themeToggle" aria-label="Changer le thème">◐</button><button class="round-tool" id="openAuth">Connexion</button><span class="help">Centre d'aide</span><div class="avatar">SM</div></div></header>
 <main>
@@ -134,7 +164,7 @@ body.dark .field input,body.dark .field select{background:#102017;color:#eef5ef;
 <section class="screen" id="cards"><div class="page-head"><button class="back-link" data-go="home">← Retour</button><div class="eyebrow">MOYEN DE PAIEMENT</div><h1>Cartes</h1><p>Découvrez votre carte TESTE.</p></div><div class="mini-card" style="min-height:205px;padding:24px"><div style="display:flex;justify-content:space-between"><small>TESTE · CARTE</small><small>PREMIUM</small></div><div class="chip" style="margin-top:32px"></div><div class="card-bottom"><div><strong>•••• &nbsp; •••• &nbsp; •••• &nbsp; 2048</strong><br><small>SALOMON M'BAL</small><br><small>EXPIRE 12/29</small></div><strong style="font-size:24px">VISA</strong></div></div><div class="panel" style="margin-top:15px"><h3>Paramètres de la carte</h3><div class="setting"><span>Carte TESTE</span><b class="pill">Active</b></div><div class="setting"><span>Paiements en ligne</span><b>Indisponible</b></div><p class="form-note">Gérez votre carte et vos préférences de paiement.</p></div></section>
 <section class="screen" id="security"><div class="page-head"><button class="back-link" data-go="profile">← Retour au profil</button><div class="eyebrow">PROTECTION</div><h1>Sécurité</h1><p>Paramètres visuels de sécurité.</p></div><div class="panel"><div class="setting"><span>Vérification en deux étapes</span><b class="pill">À configurer</b></div><div class="setting"><span>Appareils connectés</span><b>1 appareil</b></div><div class="setting"><span>Code confidentiel</span><b>••••</b></div><div class="setting"><span>Alertes de connexion</span><b>Activées</b></div></div></section>
 <section class="screen" id="notifications"><div class="page-head"><button class="back-link" data-go="home">← Retour</button><div class="eyebrow">CENTRE DE NOTIFICATIONS</div><h1>Notifications</h1><p>Les dernières informations de votre espace TESTE.</p></div><div class="panel"><div class="activity-row"><span>Bienvenue sur TESTE</span><span class="pill">Nouveau</span></div><div class="activity-row"><span>Votre aperçu de compte est prêt</span><small>Hier</small></div><div class="activity-row"><span>Découvrez le convertisseur</span><small>04 nov.</small></div></div></section>
-<div class="auth-screen" id="authScreen"><div class="auth-wrap"><div class="brand"><span class="brand-mark">T</span>teste</div><div class="eyebrow">BIENVENUE CHEZ TESTE</div><h1 id="authTitle">Connectez-vous à votre espace.</h1><p>Une expérience financière claire, dans une interface pensée pour vous.</p><div class="auth-toggle"><button class="selected" id="loginTab">Connexion</button><button id="signupTab">Inscription</button></div><label class="field"><span>Adresse e-mail</span><input type="email" placeholder="vous@exemple.com"></label><label class="field"><span>Mot de passe</span><input type="password" placeholder="••••••••"></label><button class="primary-btn" data-toast="Connexion en cours de préparation">Continuer</button><p class="form-note">Accédez à votre espace personnel TESTE.</p><button class="back-link" id="closeAuth">← Revenir à l'application</button></div></div>
+<div class="auth-screen" id="authScreen"><div class="auth-wrap"><div class="brand"><span class="brand-mark">T</span>teste</div><div class="eyebrow">BIENVENUE CHEZ TESTE</div><h1 id="authTitle">Connectez-vous à votre espace.</h1><p>Une expérience financière claire, dans une interface pensée pour vous.</p><div class="auth-toggle"><button class="selected" id="loginTab">Connexion</button><button id="signupTab">Inscription</button></div><label class="field" id="nameField" style="display:none"><span>Nom complet</span><input id="localName" type="text" autocomplete="name" placeholder="Votre nom"></label><label class="field"><span>Adresse e-mail</span><input id="localEmail" type="email" autocomplete="username" placeholder="vous@exemple.com"></label><label class="field"><span>Mot de passe</span><input id="localPassword" type="password" autocomplete="current-password" placeholder="Au moins 8 caractères"></label><button class="primary-btn" id="authSubmit">Se connecter</button><p class="form-note" id="authMessage">Votre compte est enregistré uniquement sur cet appareil.</p><button class="back-link" id="closeAuth">← Retour</button></div></div>
 <script>
 function goToScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('[data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));window.scrollTo({top:0,behavior:'smooth'});}
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>goToScreen(b.dataset.go)));
@@ -180,6 +210,72 @@ document.querySelectorAll('#activity .activity-row').forEach(row=>row.addEventLi
 document.getElementById('detailModal')?.addEventListener('click',e=>{if(e.target.id==='detailModal')e.currentTarget.classList.remove('open');});
 try{if(localStorage.getItem('teste-theme')==='dark')document.body.classList.add('dark');}catch(e){}
 document.getElementById('themeToggle')?.addEventListener('click',()=>{try{localStorage.setItem('teste-theme',document.body.classList.contains('dark')?'dark':'light');}catch(e){}});
+
+
+/* Comptes locaux : les identifiants restent sur cet appareil */
+const welcomeScreen=document.getElementById('welcomeScreen');
+const authScreen=document.getElementById('authScreen');
+const authSubmit=document.getElementById('authSubmit');
+const authMessage=document.getElementById('authMessage');
+const loginTab=document.getElementById('loginTab');
+const signupTab=document.getElementById('signupTab');
+const nameField=document.getElementById('nameField');
+let authMode='login';
+const ACCOUNT_KEY='teste_device_account_v1';
+function getLocalAccount(){try{return JSON.parse(localStorage.getItem(ACCOUNT_KEY)||'null')}catch(e){return null}}
+function setAuthMode(mode){
+ authMode=mode;
+ loginTab.classList.toggle('selected',mode==='login');
+ signupTab.classList.toggle('selected',mode==='signup');
+ nameField.style.display=mode==='signup'?'block':'none';
+ document.getElementById('authTitle').textContent=mode==='signup'?'Créez votre espace TESTE.':'Connectez-vous à votre espace.';
+ authSubmit.textContent=mode==='signup'?'Créer mon compte':'Se connecter';
+ document.getElementById('localPassword').autocomplete=mode==='signup'?'new-password':'current-password';
+ authMessage.textContent=mode==='signup'?'Choisissez un mot de passe d’au moins 8 caractères.':'Votre compte est enregistré uniquement sur cet appareil.';
+}
+async function passwordHash(password,salt){
+ const enc=new TextEncoder();
+ const key=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveBits']);
+ const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(salt),iterations:120000,hash:'SHA-256'},key,256);
+ return [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+document.getElementById('getStarted').addEventListener('click',()=>{
+ welcomeScreen.style.display='none';authScreen.classList.add('open');setAuthMode(getLocalAccount()?'login':'signup');
+});
+document.getElementById('openAuth')?.addEventListener('click',()=>{authScreen.classList.add('open');setAuthMode('login')});
+document.getElementById('closeAuth').addEventListener('click',()=>{authScreen.classList.remove('open');welcomeScreen.style.display='flex'});
+loginTab.addEventListener('click',()=>setAuthMode('login'));
+signupTab.addEventListener('click',()=>setAuthMode('signup'));
+authSubmit.addEventListener('click',async()=>{
+ const email=document.getElementById('localEmail').value.trim().toLowerCase();
+ const password=document.getElementById('localPassword').value;
+ const name=document.getElementById('localName').value.trim();
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){authMessage.textContent='Saisissez une adresse e-mail valide.';return}
+ if(password.length<8){authMessage.textContent='Le mot de passe doit contenir au moins 8 caractères.';return}
+ if(!window.crypto?.subtle){authMessage.textContent='La sécurité locale nécessite une connexion HTTPS.';return}
+ authSubmit.disabled=true;
+ try{
+  if(authMode==='signup'){
+   if(getLocalAccount()){authMessage.textContent='Un compte existe déjà sur cet appareil. Connectez-vous.';return}
+   if(!name){authMessage.textContent='Saisissez votre nom complet.';return}
+   const salt=crypto.randomUUID();const hash=await passwordHash(password,salt);
+   localStorage.setItem(ACCOUNT_KEY,JSON.stringify({name,email,salt,hash,createdAt:new Date().toISOString()}));
+  }else{
+   const account=getLocalAccount();
+   if(!account){authMessage.textContent='Aucun compte trouvé sur cet appareil. Choisissez Inscription.';return}
+   const hash=await passwordHash(password,account.salt);
+   if(email!==account.email||hash!==account.hash){authMessage.textContent='Adresse e-mail ou mot de passe incorrect.';return}
+  }
+  const account=getLocalAccount();
+  const safeName=(account.name||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  document.querySelector('.welcome h1').innerHTML='Bonjour, '+safeName;
+  const profileName=document.querySelector('.profile-head strong');if(profileName)profileName.textContent=account.name;
+  const avatar=(account.name||'T').split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+  document.querySelector('.avatar').textContent=avatar;document.querySelector('.profile-avatar').textContent=avatar;
+  authScreen.classList.remove('open');welcomeScreen.style.display='none';showScreen('home');toast('Bienvenue sur TESTE');
+ }catch(e){authMessage.textContent='Impossible d’enregistrer le compte sur cet appareil.'}
+ finally{authSubmit.disabled=false}
+});
 
 </script></body>
 </html>
