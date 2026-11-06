@@ -450,7 +450,7 @@ document.getElementById('withdrawSubmit')?.addEventListener('click',async()=>{
   document.getElementById('withdrawSuccess').hidden=false;
   toast('Demande de retrait enregistrée · '+String(data).slice(0,8));
   const {data:{user}}=await supabaseClient.auth.getUser();
-  if(user){try{await loadUserData(user);}catch(refreshError){toast('Retrait enregistré. Actualisation des soldes indisponible.');}}
+  if(user){try{await loadUserData(user);showScreen('withdraw');}catch(refreshError){showScreen('withdraw');toast('Retrait enregistré. Actualisation des soldes indisponible.');}}
  }catch(e){
   pendingWithdrawal=null;panel.hidden=true;
   toast(e.message||'Demande de retrait refusée.');
