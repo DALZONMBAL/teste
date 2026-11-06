@@ -58,7 +58,6 @@ declare
   v_daily_total bigint;
   v_max_transaction bigint;
   v_daily_limit bigint;
-  v_totp_timestamp bigint;
   v_exchange_rate numeric(18,6);
 begin
   if v_sender is null then raise exception 'Connexion requise'; end if;
@@ -66,21 +65,6 @@ begin
   select u.email_confirmed_at into v_email_confirmed_at
   from auth.users u where u.id = v_sender;
   if v_email_confirmed_at is null then raise exception 'Confirmation e-mail requise'; end if;
-
-  if coalesce(auth.jwt()->>'aal','aal1') <> 'aal2' then
-    raise exception 'Vérification MFA requise';
-  end if;
-
-  select pg_catalog.max((f.item->>'timestamp')::bigint)
-    into v_totp_timestamp
-  from pg_catalog.jsonb_array_elements(coalesce(auth.jwt()->'amr','[]'::jsonb)) as f(item)
-  where f.item->>'method' = 'totp'
-    and pg_catalog.jsonb_typeof(f.item->'timestamp') = 'number';
-
-  if v_totp_timestamp is null or v_totp_timestamp <
-    pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now()))::bigint - 90 then
-    raise exception 'Un nouveau code de vérification est requis';
-  end if;
 
   if p_operator is null or p_operator not in ('airtel_money','orange_money','mpesa') then
     raise exception 'Opérateur Mobile Money non reconnu';
@@ -93,11 +77,6 @@ begin
   end if;
   if p_currency is null or p_currency not in ('USD','CDF') then raise exception 'Devise non prise en charge'; end if;
   if p_idempotency_key is null then raise exception 'Référence de demande manquante'; end if;
-
-  insert into public.mfa_transfer_proofs(user_id,proof_timestamp)
-  values (v_sender,v_totp_timestamp)
-  on conflict (user_id,proof_timestamp) do nothing;
-  if not found then raise exception 'Ce code de sécurité a déjà été utilisé'; end if;
 
   select t.id into v_transfer
   from public.transfers t
@@ -171,9 +150,6 @@ begin
   ) values (
     v_transfer,v_sender,v_central,p_operator,p_phone_number,p_currency,p_amount_minor,'recorded'
   );
-
-  update public.mfa_transfer_proofs set transfer_id=v_transfer
-  where user_id=v_sender and proof_timestamp=v_totp_timestamp;
 
   insert into public.security_events(user_id,event_type,details)
   values (v_sender,'mobile_money_withdrawal_recorded',
