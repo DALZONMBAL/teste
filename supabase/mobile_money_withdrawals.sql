@@ -82,7 +82,7 @@ begin
     raise exception 'Un nouveau code de vérification est requis';
   end if;
 
-  if p_operator not in ('airtel_money','orange_money','mpesa') then
+  if p_operator is null or p_operator not in ('airtel_money','orange_money','mpesa') then
     raise exception 'Opérateur Mobile Money non reconnu';
   end if;
   if p_phone_number is null or p_phone_number !~ '^\\+?[0-9]{9,15}$' then
@@ -91,7 +91,7 @@ begin
   if p_amount_minor is null or p_amount_minor <= 0 then
     raise exception 'Montant invalide';
   end if;
-  if p_currency not in ('USD','CDF') then raise exception 'Devise non prise en charge'; end if;
+  if p_currency is null or p_currency not in ('USD','CDF') then raise exception 'Devise non prise en charge'; end if;
   if p_idempotency_key is null then raise exception 'Référence de demande manquante'; end if;
 
   insert into public.mfa_transfer_proofs(user_id,proof_timestamp)
