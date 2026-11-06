@@ -384,7 +384,7 @@ document.getElementById('sendTransferBtn')?.addEventListener('click',async()=>{
    toast('Un code de vérification est nécessaire.');return;
   }
   const code=(mfaCode.value||'').trim();
-  if(!/^\\d{6}$/.test(code)){mfaPanel.hidden=false;mfaMessage.textContent='Saisissez le code à 6 chiffres.';return;}
+  if(!/^\d{6}$/.test(code)){mfaPanel.hidden=false;mfaMessage.textContent='Saisissez le code à 6 chiffres.';return;}
   const {error:verifyError}=await supabaseClient.auth.mfa.verify({factorId:pendingTransferMfa.factorId,challengeId:pendingTransferMfa.challengeId,code});
   if(verifyError)throw verifyError;
   const {data,error}=await supabaseClient.rpc('teste_send_simulated_transfer',{
@@ -408,6 +408,7 @@ document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
 });
 
 // Retraits Mobile Money : écriture comptable interne vers le compte central TESTE.
+let pendingWithdrawalRequest=null;
 document.getElementById('withdrawSubmit')?.addEventListener('click',async()=>{
  const operator=document.querySelector('input[name="withdrawOperator"]:checked')?.value;
  const phone=(document.getElementById('withdrawPhone')?.value||'').replace(/[\s().-]/g,'');
@@ -422,10 +423,13 @@ document.getElementById('withdrawSubmit')?.addEventListener('click',async()=>{
  if(!/^\+?[0-9]{9,15}$/.test(phone)){toast('Saisissez un numéro valide.');return;}
  if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant valide.');return;}
  const amountMinor=Math.round(amount*(currency==='USD'?100:1));
+ const fingerprint=[operator,phone,amountMinor,currency].join('|');
+ if(!pendingWithdrawalRequest||pendingWithdrawalRequest.fingerprint!==fingerprint){pendingWithdrawalRequest={fingerprint,key:crypto.randomUUID()};}
  button.disabled=true;
  try{
-  const {data,error}=await supabaseClient.rpc('teste_mobile_money_withdrawal',{p_operator:operator,p_phone_number:phone,p_amount_minor:amountMinor,p_currency:currency,p_idempotency_key:crypto.randomUUID()});
+  const {data,error}=await supabaseClient.rpc('teste_mobile_money_withdrawal',{p_operator:operator,p_phone_number:phone,p_amount_minor:amountMinor,p_currency:currency,p_idempotency_key:pendingWithdrawalRequest.key});
   if(error)throw error;
+  pendingWithdrawalRequest=null;
   const labels={airtel_money:'Airtel Money',orange_money:'Orange Money',mpesa:'M-Pesa'};
   document.getElementById('withdrawReceiptOperator').textContent=labels[operator]||operator;
   document.getElementById('withdrawReceiptAmount').textContent=money(amountMinor,currency);
