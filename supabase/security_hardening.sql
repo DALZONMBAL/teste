@@ -25,6 +25,16 @@ create index if not exists ledger_entries_user_created_idx
 create index if not exists ledger_entries_transfer_idx
   on public.ledger_entries(transfer_id);
 
+-- Une preuve MFA récente ne peut autoriser qu'une seule opération.
+-- Aucun accès direct depuis le navigateur.
+create table if not exists public.mfa_transfer_proofs (
+  user_id uuid not null references auth.users(id) on delete restrict,
+  proof_timestamp bigint not null,
+  transfer_id uuid unique references public.transfers(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  primary key(user_id, proof_timestamp)
+);
+
 -- 3) Taux de conversion indicatif, lu par le navigateur mais modifiable uniquement
 -- depuis SQL par un administrateur du projet. Aucun taux envoyé par le client.
 create table if not exists public.exchange_rates (
@@ -44,6 +54,7 @@ alter table public.transfers enable row level security;
 alter table public.security_events enable row level security;
 alter table public.ledger_entries enable row level security;
 alter table public.exchange_rates enable row level security;
+alter table public.mfa_transfer_proofs enable row level security;
 
 -- Supprimer les anciennes politiques sur les tables concernées afin d'éviter
 -- qu'une ancienne politique permissive s'ajoute aux nouvelles.
@@ -55,7 +66,7 @@ begin
     from pg_policies
     where schemaname = 'public'
       and tablename in ('profiles','wallets','test_cards','transfers',
-                        'security_events','ledger_entries','exchange_rates')
+                        'security_events','ledger_entries','exchange_rates','mfa_transfer_proofs')
   loop
     execute format('drop policy if exists %I on %I.%I',
                    p.policyname, p.schemaname, p.tablename);
@@ -82,7 +93,7 @@ create policy exchange_rates_select_authenticated on public.exchange_rates
 -- transferts, cartes, écritures ou événements directement.
 revoke all on public.profiles, public.wallets, public.test_cards,
   public.transfers, public.security_events, public.ledger_entries,
-  public.exchange_rates from anon, authenticated;
+  public.exchange_rates, public.mfa_transfer_proofs from anon, authenticated;
 grant select on public.profiles, public.wallets, public.test_cards,
   public.transfers, public.security_events, public.ledger_entries,
   public.exchange_rates to authenticated;
@@ -214,6 +225,7 @@ declare
   v_daily_total bigint;
   v_max_transaction bigint;
   v_daily_limit bigint;
+  v_totp_timestamp bigint;
 begin
   if v_sender is null then
     raise exception 'Authentication required';
@@ -229,13 +241,16 @@ begin
     raise exception 'MFA verification required';
   end if;
 
-  if not exists (
-    select 1
-    from pg_catalog.jsonb_array_elements(
-      coalesce(auth.jwt()->'amr','[]'::jsonb)
-    ) as factors(item)
-    where factors.item->>'method' = 'totp'
-      and (factors.item->>'timestamp') ~ '^[0-9]+
+  select pg_catalog.max((factors.item->>'timestamp')::bigint)
+    into v_totp_timestamp
+  from pg_catalog.jsonb_array_elements(
+    coalesce(auth.jwt()->'amr','[]'::jsonb)
+  ) as factors(item)
+  where factors.item->>'method' = 'totp'
+    and pg_catalog.jsonb_typeof(factors.item->'timestamp') = 'number';
+
+  if v_totp_timestamp is null or v_totp_timestamp <
+     pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now()))::bigint - 90 then
     raise exception 'A fresh TOTP code is required for each transfer';
   end if;
 
@@ -253,6 +268,14 @@ begin
     raise exception 'Idempotency key required';
   end if;
 
+  -- Consommer une seule fois la preuve TOTP de cette session.
+  insert into public.mfa_transfer_proofs(user_id,proof_timestamp)
+  values (v_sender,v_totp_timestamp)
+  on conflict (user_id,proof_timestamp) do nothing;
+  if not found then
+    raise exception 'This MFA proof has already authorized an operation';
+  end if;
+
   -- Limits équivalents à 1 000 USD par opération et 5 000 USD par jour.
   v_max_transaction := case when p_currency = 'USD' then 100000 else 2850000 end;
   v_daily_limit := case when p_currency = 'USD' then 500000 else 14250000 end;
@@ -265,6 +288,9 @@ begin
   from public.transfers t
   where t.sender_id = v_sender and t.idempotency_key = p_idempotency_key;
   if v_transfer is not null then
+    update public.mfa_transfer_proofs
+    set transfer_id = v_transfer
+    where user_id = v_sender and proof_timestamp = v_totp_timestamp;
     return v_transfer;
   end if;
 
@@ -338,6 +364,10 @@ begin
   set balance_minor = balance_minor + p_amount_minor
   where id = v_recipient_wallet;
 
+  update public.mfa_transfer_proofs
+  set transfer_id = v_transfer
+  where user_id = v_sender and proof_timestamp = v_totp_timestamp;
+
   insert into public.ledger_entries(
     transfer_id,user_id,wallet_id,entry_type,currency,amount_minor
   ) values
@@ -404,14 +434,13 @@ commit;
 
 
 -- 10) Vérification après migration : toutes les tables de TESTE doivent afficher rowsecurity = true.
-select schemaname, tablename, rowsecurity
-from pg_tables
-join pg_class on pg_class.relname = pg_tables.tablename
-join pg_namespace on pg_namespace.oid = pg_class.relnamespace
-where schemaname = 'public'
-  and tablename in ('profiles','wallets','test_cards','transfers',
-                    'security_events','ledger_entries','exchange_rates')
-order by tablename;
+select n.nspname as schemaname, c.relname as tablename,
+       c.relrowsecurity as rowsecurity
+from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relkind = 'r'
+order by c.relname;
 
 -- Pour modifier le taux indicatif, exécuter manuellement dans SQL Editor :
 -- update public.exchange_rates set rate = 2850, updated_at = now() where pair = 'USD_CDF';
