@@ -1,5 +1,5 @@
-const CACHE='teste-shell-v17';
-const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./app.js'];
+const CACHE='teste-shell-v18';
+const ASSETS=['./index.html','./manifest.webmanifest','./icon.svg','./app.js'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));
  self.skipWaiting();
@@ -22,7 +22,7 @@ self.addEventListener('fetch',event=>{
   }).catch(()=>caches.match('./index.html')));
   return;
  }
- if(!ASSETS.some(path=>url.pathname.endsWith(path.replace('./',''))))return;
+ if(!ASSETS.some(path=>url.pathname===new URL(path,self.location.href).pathname))return;
  event.respondWith(caches.match(request).then(cached=>cached||fetch(request).then(response=>{
   if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(request,copy));}
   return response;
