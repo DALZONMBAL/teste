@@ -484,27 +484,33 @@ supabaseClient.auth.onAuthStateChange((event,session)=>{
 })();
 
 /* QR TESTE : lecture d'un identifiant de compte, puis préremplissage du destinataire */
-let testeQrScanner=null;
+let testeQrScanner=null,testeQrBusy=false;
 document.getElementById('openQrScanner')?.addEventListener('click',async()=>{
  const panel=document.getElementById('qrScannerPanel');
+ if(testeQrScanner?.isScanning)return;
  panel.hidden=false;
  if(!window.Html5Qrcode){toast('Scanner indisponible. Saisissez le numéro manuellement.');return;}
  try{
-  if(!testeQrScanner)testeQrScanner=new Html5Qrcode('qrReader');
+  if(!testeQrScanner)testeQrScanner=new Html5Qrcode('qrReader',{verbose:false});
   const cameras=await Html5Qrcode.getCameras();
   if(!cameras.length)throw new Error('Aucune caméra détectée');
-  await testeQrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:230,height:230}},async(decodedText)=>{
+  await testeQrScanner.start({facingMode:'environment'},{fps:8,qrbox:{width:220,height:220}},async(decodedText)=>{
+   if(testeQrBusy)return;
    const value=String(decodedText||'').trim();
    if(!/^TESTE\|TST[A-Z0-9]{10}$/i.test(value)){toast('Ce QR code ne correspond pas à un compte TESTE');return;}
-   document.getElementById('recipientAccount').value=value.split('|')[1].toUpperCase();
-   await testeQrScanner.stop();
-   panel.hidden=true;
+   testeQrBusy=true;
+   document.getElementById('recipientAccount').value=value.slice(6).toUpperCase();
+   try{await testeQrScanner.stop();}catch(e){}
+   panel.hidden=true;testeQrBusy=false;
    toast('Compte destinataire reconnu');
   },()=>{});
- }catch(e){panel.hidden=true;toast('Caméra inaccessible. Autorisez son utilisation ou saisissez le numéro.');}
+ }catch(e){try{if(testeQrScanner?.isScanning)await testeQrScanner.stop();}catch(stopError){}panel.hidden=true;toast('Caméra inaccessible. Autorisez son utilisation ou saisissez le numéro.');}
+});
+document.addEventListener('visibilitychange',async()=>{
+ if(document.hidden&&testeQrScanner?.isScanning){try{await testeQrScanner.stop();}catch(e){}document.getElementById('qrScannerPanel').hidden=true;}
 });
 document.getElementById('closeQrScanner')?.addEventListener('click',async()=>{
- if(testeQrScanner){try{await testeQrScanner.stop();}catch(e){}}
+ if(testeQrScanner?.isScanning){try{await testeQrScanner.stop();}catch(e){}}
  document.getElementById('qrScannerPanel').hidden=true;
 });
 
