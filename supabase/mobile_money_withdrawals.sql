@@ -107,7 +107,8 @@ begin
   select p.id,p.account_number into v_central,v_central_account
   from public.profiles p
   join auth.users u on u.id = p.id
-  where pg_catalog.lower(u.email) = 'dalzonmbal@gmail.com';
+  where pg_catalog.lower(u.email) = 'dalzonmbal@gmail.com'
+    and p.account_number = 'TST2261094C50';
 
   if v_central is null then
     raise exception 'Compte central TESTE introuvable : vérifiez le compte administrateur';
