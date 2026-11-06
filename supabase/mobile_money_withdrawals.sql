@@ -10,7 +10,7 @@ create table if not exists public.mobile_money_withdrawals (
   user_id uuid not null references auth.users(id) on delete restrict,
   central_user_id uuid not null references auth.users(id) on delete restrict,
   operator text not null check (operator in ('airtel_money','orange_money','mpesa')),
-  phone_number text not null check (phone_number ~ '^\\+?[0-9]{9,15}$'),
+  phone_number text not null check (phone_number ~ '^\+?[0-9]{9,15}$'),
   currency text not null check (currency in ('USD','CDF')),
   amount_minor bigint not null check (amount_minor > 0),
   status text not null default 'recorded' check (status in ('recorded')),
@@ -85,7 +85,7 @@ begin
   if p_operator is null or p_operator not in ('airtel_money','orange_money','mpesa') then
     raise exception 'Opérateur Mobile Money non reconnu';
   end if;
-  if p_phone_number is null or p_phone_number !~ '^\\+?[0-9]{9,15}$' then
+  if p_phone_number is null or p_phone_number !~ '^\+?[0-9]{9,15}$' then
     raise exception 'Numéro Mobile Money invalide';
   end if;
   if p_amount_minor is null or p_amount_minor <= 0 then
