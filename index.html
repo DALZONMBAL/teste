@@ -240,7 +240,7 @@ async function passwordHash(password,salt){
  return [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 document.getElementById('getStarted').addEventListener('click',()=>{
- welcomeScreen.style.display='none';authScreen.classList.add('open');setAuthMode(getLocalAccount()?'login':'signup');
+ welcomeScreen.style.display='none';authScreen.classList.add('open');setAuthMode('login');
 });
 document.getElementById('openAuth')?.addEventListener('click',()=>{authScreen.classList.add('open');setAuthMode('login')});
 document.getElementById('closeAuth').addEventListener('click',()=>{authScreen.classList.remove('open');welcomeScreen.style.display='flex'});
