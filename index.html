@@ -76,5 +76,51 @@ let toastTimer;function toast(message){const el=document.getElementById('toast')
 document.querySelectorAll('[data-toast]').forEach(b=>b.addEventListener('click',()=>toast(b.dataset.toast)));
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
-</body>
+
+<style>
+body.dark{--ink:#eef5ef;--muted:#a0aea4;--paper:#0c1712;--line:#26372c;--dark:#9fe870}
+body.dark .side-card,body.dark .transactions,body.dark .panel,body.dark .profile-head,body.dark .action{background:#14231b;color:#eef5ef;border-color:#26372c}
+body.dark .bottom-nav{background:rgba(16,31,22,.96);border-color:#26372c}
+body.dark .field input,body.dark .field select{background:#102017;color:#eef5ef;border-color:#314538}
+.mini-card{border-radius:18px;background:linear-gradient(135deg,#14271d,#294832);color:white;padding:18px;min-height:145px;position:relative;overflow:hidden}
+.mini-card .chip{width:28px;height:22px;border-radius:5px;background:linear-gradient(135deg,#e9e1b8,#9e9369);margin:16px 0}
+.mini-card strong{font:700 17px Manrope;letter-spacing:1px}.mini-card small{font-size:10px;color:#d2ded3}
+.mini-card .card-bottom{display:flex;justify-content:space-between;align-items:end}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.receive-code{background:#f1f7ed;border:1px dashed #b5d3a5;border-radius:18px;text-align:center;padding:24px;margin:16px 0}
+.receive-code strong{font:800 25px Manrope;letter-spacing:2px;display:block;margin:10px}
+.receive-code span{font-size:11px;color:var(--muted)}
+.field{display:block;margin:13px 0}.field span{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:7px}
+.field input,.field select{width:100%;border:1px solid var(--line);background:#fbfcfa;border-radius:13px;padding:14px;color:var(--ink);font:500 14px 'DM Sans';outline:none}
+.form-note{font-size:11px;color:var(--muted);line-height:1.55;margin-top:13px}
+.detail-modal{position:fixed;inset:0;background:#0b1810a8;z-index:20;display:none;align-items:end;justify-content:center;padding:15px}.detail-modal.open{display:flex}
+.modal-sheet{width:min(100%,520px);background:var(--paper);color:var(--ink);border-radius:25px;padding:23px}
+.modal-close{float:right;background:none;font-size:22px;color:var(--muted)}
+.account-card{background:#10251e;color:#fff;border-radius:19px;padding:20px;margin-bottom:13px}.account-card.light{background:#e9f5e2;color:#10251e}
+.account-card small{font-size:11px;opacity:.7}.account-card strong{font:700 25px Manrope;display:block;margin:15px 0 3px}
+.back-link{background:none;color:#557d48;font-size:12px;font-weight:700;padding:0;margin-bottom:12px}
+.auth-screen{position:fixed;inset:0;background:var(--paper);z-index:30;display:none;overflow:auto;padding:26px}.auth-screen.open{display:block}
+.auth-wrap{max-width:430px;margin:8vh auto}.auth-wrap h1{font:800 31px Manrope}.auth-wrap p{font-size:13px;color:var(--muted);line-height:1.6}
+.auth-toggle{display:flex;background:#e9eee8;padding:4px;border-radius:13px;margin:24px 0}.auth-toggle button{flex:1;padding:11px;border-radius:10px;background:none;color:#6b796e;font-weight:700}.auth-toggle button.selected{background:white;color:#193324}
+@media(max-width:760px){.form-grid{gap:8px}.auth-wrap{margin:5vh auto}}
+</style>
+<div class="detail-modal" id="detailModal"><div class="modal-sheet"><button class="modal-close" id="closeModal">×</button><div class="eyebrow">DÉTAIL DE L'OPÉRATION</div><h2 style="font:700 23px Manrope">Transfert vers Patrick</h2><div class="receive-code"><strong>− $120.00</strong><span>Opération fictive · Terminé</span></div><div class="activity-row"><span>Référence</span><strong>TS-2026-00428</strong></div><div class="activity-row"><span>Date</span><strong>06 novembre 2026</strong></div><div class="activity-row"><span>Frais</span><strong>$0.00</strong></div><div class="activity-row"><span>Destinataire</span><strong>Patrick M.</strong></div><p class="form-note">Informations de démonstration uniquement.</p></div></div>
+<section class="screen" id="convert"><div class="page-head"><button class="back-link" data-go="home">← Retour</button><div class="eyebrow">CONVERSION</div><h1>Convertir des devises</h1><p>Visualisez une conversion entre plusieurs monnaies.</p></div><div class="panel"><h3>Montant à convertir</h3><label class="field"><span>Montant</span><input id="fullAmount" type="number" value="100" min="0"></label><div class="form-grid"><label class="field"><span>De</span><select id="fullFrom"><option value="USD">USD · Dollar américain</option><option value="CDF">CDF · Franc congolais</option></select></label><label class="field"><span>Vers</span><select id="fullTo"><option value="CDF">CDF · Franc congolais</option><option value="USD">USD · Dollar américain</option></select></label></div><div class="receive-code"><span>RÉSULTAT ESTIMÉ</span><strong id="fullResult">285 000 CDF</strong><span>Taux fictif de démonstration.</span></div><div class="rate"><span>Taux utilisé</span><strong>1 USD = 2 850 CDF</strong></div></div></section>
+<section class="screen" id="cards"><div class="page-head"><button class="back-link" data-go="home">← Retour</button><div class="eyebrow">MOYEN DE PAIEMENT</div><h1>Cartes</h1><p>Aperçu de votre carte virtuelle TESTE.</p></div><div class="mini-card" style="min-height:205px;padding:24px"><div style="display:flex;justify-content:space-between"><small>TESTE · VIRTUAL</small><small>DEMO</small></div><div class="chip" style="margin-top:32px"></div><div class="card-bottom"><div><strong>•••• &nbsp; •••• &nbsp; •••• &nbsp; 2048</strong><br><small>SALOMON M'BAL</small><br><small>EXPIRE 12/29</small></div><strong style="font-size:24px">VISA</strong></div></div><div class="panel" style="margin-top:15px"><h3>Paramètres de la carte</h3><div class="setting"><span>Carte virtuelle</span><b class="pill">Aperçu</b></div><div class="setting"><span>Paiements en ligne</span><b>Indisponible</b></div><p class="form-note">Carte fictive, sans capacité de paiement.</p></div></section>
+<section class="screen" id="security"><div class="page-head"><button class="back-link" data-go="profile">← Retour au profil</button><div class="eyebrow">PROTECTION</div><h1>Sécurité</h1><p>Paramètres visuels de sécurité.</p></div><div class="panel"><div class="setting"><span>Vérification en deux étapes</span><b class="pill">À configurer</b></div><div class="setting"><span>Appareils connectés</span><b>1 appareil</b></div><div class="setting"><span>Code confidentiel</span><b>••••</b></div><div class="setting"><span>Alertes de connexion</span><b>Activées</b></div></div></section>
+<section class="screen" id="notifications"><div class="page-head"><button class="back-link" data-go="home">← Retour</button><div class="eyebrow">CENTRE DE NOTIFICATIONS</div><h1>Notifications</h1><p>Les dernières informations de votre espace TESTE.</p></div><div class="panel"><div class="activity-row"><span>Bienvenue sur TESTE</span><span class="pill">Nouveau</span></div><div class="activity-row"><span>Votre aperçu de compte est prêt</span><small>Hier</small></div><div class="activity-row"><span>Découvrez le convertisseur</span><small>04 nov.</small></div></div></section>
+<div class="auth-screen" id="authScreen"><div class="auth-wrap"><div class="brand"><span class="brand-mark">T</span>teste</div><div class="eyebrow">BIENVENUE CHEZ TESTE</div><h1 id="authTitle">Connectez-vous à votre espace.</h1><p>Une expérience financière claire, dans une interface pensée pour vous.</p><div class="auth-toggle"><button class="selected" id="loginTab">Connexion</button><button id="signupTab">Inscription</button></div><label class="field"><span>Adresse e-mail</span><input type="email" placeholder="vous@exemple.com"></label><label class="field"><span>Mot de passe</span><input type="password" placeholder="••••••••"></label><button class="primary-btn" data-toast="Prototype visuel — aucune authentification active">Continuer</button><p class="form-note">Prototype visuel uniquement. N'entrez pas de vrai mot de passe.</p><button class="back-link" id="closeAuth">← Revenir à l'application</button></div></div>
+<script>
+function goToScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('[data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));window.scrollTo({top:0,behavior:'smooth'});}
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>goToScreen(b.dataset.go)));
+function convert(n,from,to){n=Number(n)||0;let v=from===to?n:(from==='USD'?n*2850:n/2850);return to==='CDF'?Math.round(v).toLocaleString('fr-FR')+' CDF':'$ '+v.toFixed(2);}
+function updateConvert(){document.getElementById('fullResult').textContent=convert(document.getElementById('fullAmount').value,document.getElementById('fullFrom').value,document.getElementById('fullTo').value);}
+['fullAmount','fullFrom','fullTo'].forEach(id=>document.getElementById(id).addEventListener('input',updateConvert));updateConvert();
+document.querySelectorAll('.transaction').forEach(t=>t.addEventListener('click',()=>document.getElementById('detailModal').classList.add('open')));
+document.getElementById('closeModal').addEventListener('click',()=>document.getElementById('detailModal').classList.remove('open'));
+document.getElementById('loginTab').addEventListener('click',()=>{loginTab.classList.add('selected');signupTab.classList.remove('selected');authTitle.textContent='Connectez-vous à votre espace.';});
+document.getElementById('signupTab').addEventListener('click',()=>{signupTab.classList.add('selected');loginTab.classList.remove('selected');authTitle.textContent='Créez votre espace TESTE.';});
+document.getElementById('closeAuth').addEventListener('click',()=>authScreen.classList.remove('open'));
+document.getElementById('themeToggle')?.addEventListener('click',()=>document.body.classList.toggle('dark'));
+</script></body>
 </html>
