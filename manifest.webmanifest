@@ -1,0 +1,19 @@
+{
+  "name": "TESTE — Votre argent en mouvement",
+  "short_name": "TESTE",
+  "description": "Maquette mobile de l'application TESTE.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f8f5",
+  "theme_color": "#f6f8f5",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
