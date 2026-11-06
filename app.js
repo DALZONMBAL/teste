@@ -407,3 +407,52 @@ document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
  try{await navigator.clipboard.writeText(value);toast('Numéro de compte copié');}catch(e){toast(value);}
 });
 
+// Retraits Mobile Money : mouvement comptable atomique vers le compte central TESTE.
+let pendingWithdrawal=null;
+document.getElementById('withdrawSubmit')?.addEventListener('click',async()=>{
+ const operator=document.querySelector('input[name="withdrawOperator"]:checked')?.value;
+ const phone=(document.getElementById('withdrawPhone')?.value||'').replace(/[\\s().-]/g,'');
+ const amount=Number(document.getElementById('withdrawAmount')?.value||0);
+ const currency=document.getElementById('withdrawCurrency')?.value;
+ const panel=document.getElementById('withdrawMfaPanel');
+ const codeInput=document.getElementById('withdrawMfaCode');
+ const message=document.getElementById('withdrawMfaMessage');
+ const button=document.getElementById('withdrawSubmit');
+ if(!/^\\+?[0-9]{9,15}$/.test(phone)){toast('Saisissez un numéro Mobile Money valide.');return;}
+ if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant valide.');return;}
+ const amountMinor=Math.round(amount*(currency==='USD'?100:1));
+ const fingerprint=[operator,phone,amountMinor,currency].join('|');
+ button.disabled=true;
+ try{
+  const {data:factorsData,error:factorsError}=await supabaseClient.auth.mfa.listFactors();
+  if(factorsError)throw factorsError;
+  const factor=(factorsData?.totp||[]).find(item=>item.status==='verified');
+  if(!factor){showScreen('security');toast('Activez d’abord l’authentification à deux facteurs.');return;}
+  if(!pendingWithdrawal||pendingWithdrawal.fingerprint!==fingerprint){
+   const {data:challenge,error:challengeError}=await supabaseClient.auth.mfa.challenge({factorId:factor.id});
+   if(challengeError)throw challengeError;
+   pendingWithdrawal={factorId:factor.id,challengeId:challenge.id,fingerprint,key:crypto.randomUUID()};
+   panel.hidden=false;message.textContent='Saisissez le code récent de votre application pour confirmer le retrait.';codeInput.value='';codeInput.focus();
+   toast('Un code de sécurité est nécessaire.');return;
+  }
+  const code=(codeInput.value||'').trim();
+  if(!/^\\d{6}$/.test(code)){panel.hidden=false;message.textContent='Saisissez le code à 6 chiffres.';return;}
+  const {error:verifyError}=await supabaseClient.auth.mfa.verify({factorId:pendingWithdrawal.factorId,challengeId:pendingWithdrawal.challengeId,code});
+  if(verifyError)throw verifyError;
+  const {data,error}=await supabaseClient.rpc('teste_mobile_money_withdrawal',{
+   p_operator:operator,p_phone_number:phone,p_amount_minor:amountMinor,p_currency:currency,p_idempotency_key:pendingWithdrawal.key
+  });
+  if(error)throw error;
+  pendingWithdrawal=null;panel.hidden=true;codeInput.value='';
+  const labels={airtel_money:'Airtel Money',orange_money:'Orange Money',mpesa:'M-Pesa'};
+  document.getElementById('withdrawReceiptOperator').textContent=labels[operator]||operator;
+  document.getElementById('withdrawReceiptAmount').textContent=money(amountMinor,currency);
+  document.getElementById('withdrawSuccess').hidden=false;
+  toast('Demande de retrait enregistrée · '+String(data).slice(0,8));
+  const {data:{user}}=await supabaseClient.auth.getUser();
+  if(user){try{await loadUserData(user);}catch(refreshError){toast('Retrait enregistré. Actualisation des soldes indisponible.');}}
+ }catch(e){
+  pendingWithdrawal=null;panel.hidden=true;
+  toast(e.message||'Demande de retrait refusée.');
+ }finally{button.disabled=false;}
+});
