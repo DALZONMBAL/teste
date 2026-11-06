@@ -23,7 +23,7 @@
 </head>
 <body>
 <div class="app">
-<header class="top"><div class="brand"><span class="brand-mark">T</span>teste</div><div class="top-right"><span class="help">Centre d'aide</span><div class="avatar">SM</div></div></header>
+<header class="top"><div class="brand"><span class="brand-mark">T</span>teste</div><div class="top-right"><button class="round-tool" id="themeToggle" aria-label="Changer le thème">◐</button><button class="round-tool" id="openAuth">Connexion</button><span class="help">Centre d'aide</span><div class="avatar">SM</div></div></header>
 <main>
 <section class="screen active" id="home">
 <div class="layout">
@@ -122,6 +122,7 @@ document.getElementById('loginTab').addEventListener('click',()=>{document.getEl
 document.getElementById('signupTab').addEventListener('click',()=>{document.getElementById('signupTab').classList.add('selected');document.getElementById('loginTab').classList.remove('selected');document.getElementById('authTitle').textContent='Créez votre espace TESTE.';});
 document.getElementById('closeAuth').addEventListener('click',()=>document.getElementById('authScreen').classList.remove('open'));
 document.getElementById('themeToggle')?.addEventListener('click',()=>document.body.classList.toggle('dark'));
+document.getElementById('openAuth')?.addEventListener('click',()=>document.getElementById('authScreen').classList.add('open'));
 document.getElementById('openAuth')?.addEventListener('click',()=>document.getElementById('authScreen').classList.add('open'));
 function updateHomeConversion(){const amount=document.getElementById('homeAmount');if(!amount)return;const from=document.getElementById('homeFrom').value,to=document.getElementById('homeTo').value,n=Number(amount.value)||0,v=from===to?n:(from==='USD'?n*2850:n/2850);document.getElementById('homeResult').value=to==='CDF'?Math.round(v).toLocaleString('fr-FR')+' CDF':'$ '+v.toFixed(2);}
 ['homeAmount','homeFrom','homeTo'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateHomeConversion));updateHomeConversion();
