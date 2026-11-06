@@ -328,6 +328,43 @@ document.getElementById('savePreferences')?.addEventListener('click',async()=>{c
 document.getElementById('changePassword')?.addEventListener('click',async()=>{const a=document.getElementById('newPassword').value,b=document.getElementById('confirmPassword').value,msg=document.getElementById('securityMessage');if(a.length<8){msg.textContent='8 caractères minimum.';return;}if(a!==b){msg.textContent='Les mots de passe ne correspondent pas.';return;}const btn=document.getElementById('changePassword');btn.disabled=true;try{const {error}=await supabaseClient.auth.updateUser({password:a});if(error)throw error;document.getElementById('newPassword').value='';document.getElementById('confirmPassword').value='';msg.textContent='Mot de passe mis à jour.';}catch(err){msg.textContent='Erreur : '+err.message;}finally{btn.disabled=false;}});
 async function logoutCurrent(){const {error}=await supabaseClient.auth.signOut();if(error)toast('Déconnexion impossible : '+error.message);}
 document.getElementById('profileLogout')?.addEventListener('click',logoutCurrent);document.getElementById('logoutAll')?.addEventListener('click',logoutCurrent);
+let pendingEnrollmentFactorId=null;
+async function refreshMfaStatus(){
+ const {data,error}=await supabaseClient.auth.mfa.listFactors();if(error)throw error;
+ const verified=(data?.totp||[]).some(f=>f.status==='verified');
+ const msg=document.getElementById('mfaStatusMessage');
+ if(msg)msg.textContent=verified?'Authentification à deux facteurs activée. Un code sera demandé à chaque transfert.':'Aucun facteur TOTP vérifié. Configurez une application d’authentification avant tout transfert.';
+ const button=document.getElementById('enableMfa');
+ if(button)button.textContent=verified?'Ajouter une application d’authentification':'Configurer une application d’authentification';
+}
+document.getElementById('enableMfa')?.addEventListener('click',async()=>{
+ const button=document.getElementById('enableMfa');button.disabled=true;
+ try{
+  const {data,error}=await supabaseClient.auth.mfa.enroll({factorType:'totp',friendlyName:'TESTE authenticator'});
+  if(error)throw error;
+  pendingEnrollmentFactorId=data.id;
+  const qr=document.getElementById('mfaQr');qr.replaceChildren();
+  new QRCode(qr,{text:data.totp.uri,width:190,height:190,colorDark:'#10251e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  document.getElementById('mfaEnrollment').hidden=false;
+  document.getElementById('mfaSetupCode').focus();
+ }catch(e){document.getElementById('mfaStatusMessage').textContent='Configuration impossible : '+e.message;}
+ finally{button.disabled=false;}
+});
+document.getElementById('verifyMfaSetup')?.addEventListener('click',async()=>{
+ const code=document.getElementById('mfaSetupCode').value.trim(),msg=document.getElementById('mfaStatusMessage'),button=document.getElementById('verifyMfaSetup');
+ if(!pendingEnrollmentFactorId||!/^\\d{6}$/.test(code)){msg.textContent='Saisissez le code à 6 chiffres de votre application.';return;}
+ button.disabled=true;
+ try{
+  const {data:challenge,error:challengeError}=await supabaseClient.auth.mfa.challenge({factorId:pendingEnrollmentFactorId});
+  if(challengeError)throw challengeError;
+  const {error}=await supabaseClient.auth.mfa.verify({factorId:pendingEnrollmentFactorId,challengeId:challenge.id,code});
+  if(error)throw error;
+  pendingEnrollmentFactorId=null;document.getElementById('mfaEnrollment').hidden=true;document.getElementById('mfaSetupCode').value='';
+  await refreshMfaStatus();msg.textContent='Authentification à deux facteurs activée.';
+ }catch(e){msg.textContent='Code non vérifié : '+e.message;}
+ finally{button.disabled=false;}
+});
+
 
 async function loadServerExchangeRate(){
  const {data,error}=await supabaseClient.from('exchange_rates').select('rate').eq('pair','USD_CDF').single();
@@ -476,27 +513,46 @@ if(recipientInput){recipientInput.id='recipientAccount';recipientInput.placehold
 const transferButton=document.querySelector('#send button.primary-btn');
 if(transferButton){transferButton.removeAttribute('data-toast');transferButton.id='sendTransferBtn';transferButton.textContent='Effectuer le transfert de test';}
 document.getElementById('sendTransferBtn')?.addEventListener('click',async()=>{
- const recipient=document.getElementById('recipientAccount')?.value.trim();
+ const recipient=document.getElementById('recipientAccount')?.value.trim().toUpperCase();
  const amount=Number(document.getElementById('sendAmount')?.value||0);
  const currency=document.getElementById('sendFrom')?.value;
  const receiveCurrency=document.getElementById('sendTo')?.value;
- if(!recipient){toast('Saisissez le numéro de compte du destinataire');return;}
+ if(!recipient||!/^TST[A-Z0-9]{10}$/.test(recipient)){toast('Saisissez un identifiant TESTE valide.');return;}
  if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant valide');return;}
  if(currency!==receiveCurrency){toast('Pour ce test, choisissez la même devise des deux côtés');return;}
  const amountMinor=Math.round(amount*(currency==='USD'?100:1));
  const btn=document.getElementById('sendTransferBtn');btn.disabled=true;
+ const mfaPanel=document.getElementById('transferMfaPanel'),mfaCode=document.getElementById('transferMfaCode'),mfaMessage=document.getElementById('transferMfaMessage');
+ const fingerprint=[recipient,amountMinor,currency].join('|');
  try{
+  const {data:factorsData,error:factorsError}=await supabaseClient.auth.mfa.listFactors();
+  if(factorsError)throw factorsError;
+  const factor=(factorsData?.totp||[]).find(item=>item.status==='verified');
+  if(!factor){showScreen('security');toast('Activez d’abord l’authentification à deux facteurs.');return;}
+  if(!pendingTransferMfa||pendingTransferMfa.fingerprint!==fingerprint){
+   const {data:challenge,error:challengeError}=await supabaseClient.auth.mfa.challenge({factorId:factor.id});
+   if(challengeError)throw challengeError;
+   const key=pendingTransferKey?.fingerprint===fingerprint?pendingTransferKey.key:crypto.randomUUID();
+   pendingTransferKey={fingerprint,key};
+   pendingTransferMfa={factorId:factor.id,challengeId:challenge.id,fingerprint,key};
+   mfaPanel.hidden=false;mfaMessage.textContent='Saisissez le code récent de votre application pour confirmer ce transfert.';mfaCode.value='';mfaCode.focus();
+   toast('Un code de vérification est nécessaire.');return;
+  }
+  const code=(mfaCode.value||'').trim();
+  if(!/^\\d{6}$/.test(code)){mfaPanel.hidden=false;mfaMessage.textContent='Saisissez le code à 6 chiffres.';return;}
+  const {error:verifyError}=await supabaseClient.auth.mfa.verify({factorId:pendingTransferMfa.factorId,challengeId:pendingTransferMfa.challengeId,code});
+  if(verifyError)throw verifyError;
   const {data,error}=await supabaseClient.rpc('teste_send_simulated_transfer',{
-   p_recipient_account:recipient,p_amount_minor:amountMinor,p_currency:currency,p_idempotency_key:crypto.randomUUID()
+   p_recipient_account:recipient,p_amount_minor:amountMinor,p_currency:currency,p_idempotency_key:pendingTransferMfa.key
   });
   if(error)throw error;
+  pendingTransferMfa=null;pendingTransferKey=null;mfaCode.value='';mfaPanel.hidden=true;
   toast('Transfert de test enregistré · '+String(data).slice(0,8));
-  if(currentProfile){
-   const {data:{user}}=await supabaseClient.auth.getUser();
-   if(user)await loadUserData(user);
-  }
- }catch(e){toast(e.message||'Transfert refusé par les contrôles de sécurité');}
- finally{btn.disabled=false;}
+  if(currentProfile){const {data:{user}}=await supabaseClient.auth.getUser();if(user)await loadUserData(user);}
+ }catch(e){
+  pendingTransferMfa=null;mfaPanel.hidden=true;
+  toast(e.message||'Transfert refusé par les contrôles de sécurité');
+ }finally{btn.disabled=false;}
 });
 document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
  const value=currentProfile?.account_number||'Connectez-vous pour afficher votre numéro';
