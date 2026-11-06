@@ -226,6 +226,7 @@ declare
   v_max_transaction bigint;
   v_daily_limit bigint;
   v_totp_timestamp bigint;
+  v_exchange_rate numeric(18,6);
 begin
   if v_sender is null then
     raise exception 'Authentication required';
@@ -276,9 +277,16 @@ begin
     raise exception 'This MFA proof has already authorized an operation';
   end if;
 
-  -- Limits équivalents à 1 000 USD par opération et 5 000 USD par jour.
-  v_max_transaction := case when p_currency = 'USD' then 100000 else 2850000 end;
-  v_daily_limit := case when p_currency = 'USD' then 500000 else 14250000 end;
+  -- Les plafonds CDF sont calculés avec le taux stocké côté serveur.
+  select r.rate into v_exchange_rate
+  from public.exchange_rates r where r.pair = 'USD_CDF';
+  if v_exchange_rate is null or v_exchange_rate <= 0 then
+    raise exception 'Server exchange rate unavailable';
+  end if;
+  v_max_transaction := case when p_currency = 'USD'
+    then 100000 else pg_catalog.round(v_exchange_rate * 1000)::bigint end;
+  v_daily_limit := case when p_currency = 'USD'
+    then 500000 else pg_catalog.round(v_exchange_rate * 5000)::bigint end;
   if p_amount_minor > v_max_transaction then
     raise exception 'Per-transfer test limit exceeded';
   end if;
