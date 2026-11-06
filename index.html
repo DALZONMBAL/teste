@@ -20,6 +20,30 @@
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:block;margin:13px 0}.field span{display:block;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:7px}.field input,.field select{width:100%;border:1px solid var(--line);background:#fbfcfa;border-radius:13px;padding:14px;color:var(--ink);font:500 14px 'DM Sans';outline:none}.field input:focus,.field select:focus{border-color:#9acb82;box-shadow:0 0 0 3px #eaf5e4}.primary-btn{background:var(--dark);color:white;border-radius:14px;padding:15px 20px;font-weight:700;font-size:13px;width:100%;margin-top:10px}.receive-code{background:#f1f7ed;border:1px dashed #b5d3a5;border-radius:18px;text-align:center;padding:24px;margin:16px 0}.receive-code strong{font:800 25px Manrope;letter-spacing:4px;display:block;margin:10px}.receive-code span{font-size:11px;color:var(--muted)}.account-card{background:var(--dark);color:#fff;border-radius:19px;padding:20px;margin-bottom:13px}.account-card.light{background:#e9f5e2;color:var(--ink)}.account-card small{font-size:11px;opacity:.7}.account-card strong{font:700 25px Manrope;display:block;margin:15px 0 3px}.account-foot{font-size:11px;opacity:.7}.form-note{font-size:11px;color:var(--muted);line-height:1.55;margin-top:13px}.back-link{background:none;color:#557d48;font-size:12px;font-weight:700;padding:0;margin-bottom:12px}
 </style>
+
+<style>
+:root{color-scheme:light}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(126,190,91,.38);outline-offset:2px}
+.screen.active{animation:screenIn .28s ease both}
+@keyframes screenIn{from{opacity:.35;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.bottom-nav{gap:clamp(12px,7vw,76px)}
+.nav-item{min-width:52px}
+.nav-item.active{position:relative}
+.nav-item.active:before{content:"";position:absolute;top:-10px;width:22px;height:3px;border-radius:4px;background:#8acb66}
+.action:active,.primary-btn:active,.nav-item:active{transform:scale(.97)}
+.panel,.balance-card,.side-card,.profile-head,.transactions{box-shadow:0 10px 35px rgba(23,50,32,.045)}
+.field input,.field select{transition:border-color .2s,box-shadow .2s}
+.activity-row{cursor:pointer;transition:background .18s;padding-left:8px;padding-right:8px;border-radius:10px}
+.activity-row:hover{background:rgba(140,190,115,.08)}
+body.dark .account-card.light{background:#243b2b;color:#eef5ef}
+body.dark .rate,body.dark .receive-code{background:#1b3022;color:#dcebd8;border-color:#36513b}
+body.dark .promo{background:#203927;color:#eef5ef}
+body.dark .promo p{color:#c0d4bb}
+body.dark .action-icon{background:#263c2a;color:#b9ef9b}
+body.dark .transactions{background:#14231b;border-color:#26372c}
+@media(max-width:420px){.app{padding-left:15px;padding-right:15px}.bottom-nav{padding-left:8px;padding-right:8px}.nav-item{font-size:9px;min-width:48px}.nav-item svg{width:20px;height:20px}.amount{font-size:36px}.form-grid{gap:8px}.panel{padding:16px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -55,14 +79,15 @@
 <section class="screen" id="activity"><div class="page-head"><div class="eyebrow">VOTRE HISTORIQUE</div><h1>Activité</h1><p>Retrouvez vos dernières opérations en un seul endroit.</p></div><div class="panel"><label class="field"><span>Rechercher une opération</span><input id="activitySearch" placeholder="Nom, opération ou montant"></label><label class="field"><span>Filtrer par type</span><select id="activityFilter"><option value="all">Toutes les opérations</option><option value="in">Argent reçu</option><option value="out">Argent envoyé</option></select></label></div><div class="panel"><h3>Novembre 2026</h3><div class="activity-row"><span>↗ &nbsp; Transfert vers Patrick</span><strong>− $120.00</strong></div><div class="activity-row"><span>↙ &nbsp; Reçu de Grâce</span><strong>+ $250.00</strong></div><div class="activity-row"><span>⇄ &nbsp; Conversion USD → CDF</span><strong>− $50.00</strong></div></div><div class="panel"><h3>Octobre 2026</h3><div class="activity-row"><span>↙ &nbsp; Reçu de Daniel</span><strong>+ $75.00</strong></div><div class="activity-row"><span>↗ &nbsp; Transfert vers Marie</span><strong>− $35.00</strong></div></div></section>
 <section class="screen" id="profile"><div class="page-head"><div class="eyebrow">VOTRE COMPTE</div><h1>Profil</h1><p>Gérez votre espace TESTE.</p></div><div class="profile-head"><div class="profile-avatar">SM</div><div><strong>Salomon M'BAL</strong><span>Compte personnel · Profil aperçu</span></div></div><div class="panel" style="margin-top:16px"><div class="setting"><span>Informations personnelles</span><b>›</b></div><div class="setting"><span>Préférences et langue</span><b>›</b></div><div class="setting"><span>Confidentialité et sécurité</span><b>›</b></div><div class="setting"><span>Centre d'aide</span><b>›</b></div><div class="setting"><span>À propos de TESTE</span><b>›</b></div></div></section>
 
-<section class="screen" id="send"><div class="page-head"><button class="back-link" data-go="home">← Retour à l'accueil</button><div class="eyebrow">TRANSFERT</div><h1>Envoyer de l'argent</h1><p>Préparez un transfert en quelques étapes.</p></div><div class="panel"><h3>Détails du transfert</h3><label class="field"><span>Le destinataire</span><input placeholder="Nom ou adresse e-mail"></label><div class="form-grid"><label class="field"><span>Vous envoyez</span><input type="number" value="100"></label><label class="field"><span>Devise</span><select><option>USD — Dollar</option><option>CDF — Franc congolais</option></select></label></div><div class="form-grid"><label class="field"><span>Le destinataire reçoit</span><input value="285 000" readonly></label><label class="field"><span>Devise</span><select><option>CDF — Franc congolais</option><option>USD — Dollar</option></select></label></div><div class="rate"><span>Taux indicatif affiché</span><strong>1 USD ≈ 2 850 CDF</strong></div><button class="primary-btn" data-toast="Vérifiez les informations de votre transfert.">Continuer</button><p class="form-note">Vérifiez les frais et le montant avant de confirmer votre transfert.</p></div></section>
-<section class="screen" id="receive"><div class="page-head"><button class="back-link" data-go="home">← Retour à l'accueil</button><div class="eyebrow">RÉCEPTION</div><h1>Recevoir de l'argent</h1><p>Partagez vos informations de réception.</p></div><div class="panel"><h3>Votre identifiant TESTE</h3><div class="receive-code"><span>VOTRE IDENTIFIANT TESTE</span><strong>TESTE-SM-2048</strong><span>Votre espace de réception</span></div><button class="primary-btn" data-toast="Identifiant copié">Copier mon identifiant</button><p class="form-note">Partagez cet identifiant avec la personne qui souhaite vous envoyer de l'argent.</p></div></section>
+<section class="screen" id="send"><div class="page-head"><button class="back-link" data-go="home">← Retour à l'accueil</button><div class="eyebrow">TRANSFERT</div><h1>Envoyer de l'argent</h1><p>Préparez un transfert en quelques étapes.</p></div><div class="panel"><h3>Détails du transfert</h3><label class="field"><span>Le destinataire</span><input placeholder="Nom ou adresse e-mail"></label><div class="form-grid"><label class="field"><span>Vous envoyez</span><input id="sendAmount" type="number" value="100" min="0" step="0.01"></label><label class="field"><span>Devise</span><select id="sendFrom"><option value="USD">USD — Dollar</option><option value="CDF">CDF — Franc congolais</option></select></label></div><div class="form-grid"><label class="field"><span>Le destinataire reçoit</span><input id="sendReceive" value="285 000 CDF" readonly></label><label class="field"><span>Devise</span><select id="sendTo"><option value="CDF">CDF — Franc congolais</option><option value="USD">USD — Dollar</option></select></label></div><div class="rate"><span>Taux indicatif affiché</span><strong>1 USD ≈ 2 850 CDF</strong></div><button class="primary-btn" data-toast="Vérifiez les informations de votre transfert.">Continuer</button><p class="form-note">Vérifiez les frais et le montant avant de confirmer votre transfert.</p></div></section>
+<section class="screen" id="receive"><div class="page-head"><button class="back-link" data-go="home">← Retour à l'accueil</button><div class="eyebrow">RÉCEPTION</div><h1>Recevoir de l'argent</h1><p>Partagez vos informations de réception.</p></div><div class="panel"><h3>Votre identifiant TESTE</h3><div class="receive-code"><span>VOTRE IDENTIFIANT TESTE</span><strong>TESTE-SM-2048</strong><span>Votre espace de réception</span></div><button class="primary-btn" id="copyReceiveId">Copier mon identifiant</button><p class="form-note">Partagez cet identifiant avec la personne qui souhaite vous envoyer de l'argent.</p></div></section>
 <section class="screen" id="accounts"><div class="page-head"><button class="back-link" data-go="home">← Retour à l'accueil</button><div class="eyebrow">VOS COMPTES</div><h1>Comptes et devises</h1><p>Un aperçu de vos soldes dans différentes devises.</p></div><div class="account-card"><small>COMPTE EN DOLLARS AMÉRICAINS · USD</small><strong>$ 2,180.50</strong><span class="account-foot">Compte principal</span></div><div class="account-card light"><small>COMPTE EN FRANCS CONGOLAIS · CDF</small><strong>820 000 CDF</strong><span class="account-foot">Compte secondaire</span></div><div class="panel"><h3>Conversion indicative</h3><div class="activity-row"><span>1 USD</span><strong>≈ 2 850 CDF</strong></div><p class="form-note">Taux d'exemple uniquement, non actualisé et non utilisable pour une transaction.</p></div></section>
 </main>
 </div>
 <nav class="bottom-nav" aria-label="Navigation principale">
 <button class="nav-item active" data-screen="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1Z"/></svg>Accueil</button>
 <button class="nav-item" data-screen="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v16h16M7 14l4-4 3 3 6-7"/></svg>Activité</button>
+<button class="nav-item" data-screen="cards"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>Cartes</button>
 <button class="nav-item" data-screen="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profil</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -123,7 +148,6 @@ document.getElementById('signupTab').addEventListener('click',()=>{document.getE
 document.getElementById('closeAuth').addEventListener('click',()=>document.getElementById('authScreen').classList.remove('open'));
 document.getElementById('themeToggle')?.addEventListener('click',()=>document.body.classList.toggle('dark'));
 document.getElementById('openAuth')?.addEventListener('click',()=>document.getElementById('authScreen').classList.add('open'));
-document.getElementById('openAuth')?.addEventListener('click',()=>document.getElementById('authScreen').classList.add('open'));
 function updateHomeConversion(){const amount=document.getElementById('homeAmount');if(!amount)return;const from=document.getElementById('homeFrom').value,to=document.getElementById('homeTo').value,n=Number(amount.value)||0,v=from===to?n:(from==='USD'?n*2850:n/2850);document.getElementById('homeResult').value=to==='CDF'?Math.round(v).toLocaleString('fr-FR')+' CDF':'$ '+v.toFixed(2);}
 ['homeAmount','homeFrom','homeTo'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateHomeConversion));updateHomeConversion();
 
@@ -131,5 +155,31 @@ const activitySearch=document.getElementById('activitySearch');
 const activityFilter=document.getElementById('activityFilter');
 function filterActivity(){if(!activitySearch||!activityFilter)return;const q=activitySearch.value.toLowerCase();const filter=activityFilter.value;document.querySelectorAll('#activity .activity-row').forEach(row=>{const text=row.textContent.toLowerCase();const incoming=text.includes('reçu');const outgoing=text.includes('transfert')||text.includes('conversion');const typeOk=filter==='all'||(filter==='in'&&incoming)||(filter==='out'&&outgoing);row.style.display=text.includes(q)&&typeOk?'flex':'none';});}
 activitySearch?.addEventListener('input',filterActivity);activityFilter?.addEventListener('change',filterActivity);
+
+/* TESTE interactions */
+const sendAmount=document.getElementById('sendAmount');
+const sendFrom=document.getElementById('sendFrom');
+const sendTo=document.getElementById('sendTo');
+const sendReceive=document.getElementById('sendReceive');
+function updateSendQuote(){
+ if(!sendAmount||!sendFrom||!sendTo||!sendReceive)return;
+ const amount=Math.max(0,Number(sendAmount.value)||0);
+ const from=sendFrom.value,to=sendTo.value;
+ const value=from===to?amount:(from==='USD'?amount*2850:amount/2850);
+ sendReceive.value=to==='CDF'?Math.round(value).toLocaleString('fr-FR')+' CDF':'$ '+value.toFixed(2);
+}
+[sendAmount,sendFrom,sendTo].forEach(el=>el?.addEventListener('input',updateSendQuote));
+[sendFrom,sendTo].forEach(el=>el?.addEventListener('change',updateSendQuote));
+updateSendQuote();
+document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
+ const value='TESTE-SM-2048';
+ try{await navigator.clipboard.writeText(value);toast('Identifiant copié');}
+ catch(e){toast(value);}
+});
+document.querySelectorAll('#activity .activity-row').forEach(row=>row.addEventListener('click',()=>document.getElementById('detailModal')?.classList.add('open')));
+document.getElementById('detailModal')?.addEventListener('click',e=>{if(e.target.id==='detailModal')e.currentTarget.classList.remove('open');});
+try{if(localStorage.getItem('teste-theme')==='dark')document.body.classList.add('dark');}catch(e){}
+document.getElementById('themeToggle')?.addEventListener('click',()=>{try{localStorage.setItem('teste-theme',document.body.classList.contains('dark')?'dark':'light');}catch(e){}});
+
 </script></body>
 </html>
