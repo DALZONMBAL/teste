@@ -190,7 +190,7 @@ document.getElementById('enableMfa')?.addEventListener('click',async()=>{
 });
 document.getElementById('verifyMfaSetup')?.addEventListener('click',async()=>{
  const code=document.getElementById('mfaSetupCode').value.trim(),msg=document.getElementById('mfaStatusMessage'),button=document.getElementById('verifyMfaSetup');
- if(!pendingEnrollmentFactorId||!/^\\d{6}$/.test(code)){msg.textContent='Saisissez le code à 6 chiffres de votre application.';return;}
+ if(!pendingEnrollmentFactorId||!/^\d{6}$/.test(code)){msg.textContent='Saisissez le code à 6 chiffres de votre application.';return;}
  button.disabled=true;
  try{
   const {data:challenge,error:challengeError}=await supabaseClient.auth.mfa.challenge({factorId:pendingEnrollmentFactorId});
@@ -411,14 +411,14 @@ document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
 let pendingWithdrawal=null;
 document.getElementById('withdrawSubmit')?.addEventListener('click',async()=>{
  const operator=document.querySelector('input[name="withdrawOperator"]:checked')?.value;
- const phone=(document.getElementById('withdrawPhone')?.value||'').replace(/[\\s().-]/g,'');
+ const phone=(document.getElementById('withdrawPhone')?.value||'').replace(/[\s().-]/g,'');
  const amount=Number(document.getElementById('withdrawAmount')?.value||0);
  const currency=document.getElementById('withdrawCurrency')?.value;
  const panel=document.getElementById('withdrawMfaPanel');
  const codeInput=document.getElementById('withdrawMfaCode');
  const message=document.getElementById('withdrawMfaMessage');
  const button=document.getElementById('withdrawSubmit');
- if(!/^\\+?[0-9]{9,15}$/.test(phone)){toast('Saisissez un numéro Mobile Money valide.');return;}
+ if(!/^\+?[0-9]{9,15}$/.test(phone)){toast('Saisissez un numéro Mobile Money valide.');return;}
  if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant valide.');return;}
  const amountMinor=Math.round(amount*(currency==='USD'?100:1));
  const fingerprint=[operator,phone,amountMinor,currency].join('|');
