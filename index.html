@@ -24,8 +24,6 @@
 <style>
 :root{color-scheme:light}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(126,190,91,.38);outline-offset:2px}
-.screen.active{animation:screenIn .28s ease both}
-@keyframes screenIn{from{opacity:.35;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 .bottom-nav{gap:clamp(12px,7vw,76px)}
 .nav-item{min-width:52px}
 .nav-item.active{position:relative}
@@ -128,7 +126,7 @@ body.dark .transactions{background:#14231b;border-color:#26372c}
 <div class="toast" id="toast"></div>
 <script>
 const navButtons=[...document.querySelectorAll('[data-screen]')];
-function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));navButtons.forEach(b=>b.classList.toggle('active',b.dataset.screen===id));window.scrollTo({top:0,behavior:'smooth'});}
+function showScreen(id){const target=document.getElementById(id);if(!target||!target.classList.contains('screen'))return;document.querySelectorAll('.screen').forEach(s=>{const active=s===target;s.classList.toggle('active',active);s.setAttribute('aria-hidden',String(!active));});navButtons.forEach(b=>b.classList.toggle('active',b.dataset.screen===id));document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo(0,0);}
 navButtons.forEach(b=>b.addEventListener('click',()=>showScreen(b.dataset.screen)));
 document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>showScreen(b.dataset.go)));
 let hidden=false;document.getElementById('toggleBalance').addEventListener('click',()=>{hidden=!hidden;document.getElementById('balance').innerHTML=hidden?'••••••':'$ 2,480<span style="font-size:20px">.50</span>';});
@@ -175,8 +173,6 @@ body.dark .field input,body.dark .field select{background:#102017;color:#eef5ef;
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-function goToScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('[data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===id));window.scrollTo({top:0,behavior:'smooth'});}
-document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>goToScreen(b.dataset.go)));
 function convert(n,from,to){n=Number(n)||0;let v=from===to?n:(from==='USD'?n*2850:n/2850);return to==='CDF'?Math.round(v).toLocaleString('fr-FR')+' CDF':'$ '+v.toFixed(2);}
 function updateConvert(){document.getElementById('fullResult').textContent=convert(document.getElementById('fullAmount').value,document.getElementById('fullFrom').value,document.getElementById('fullTo').value);}
 ['fullAmount','fullFrom','fullTo'].forEach(id=>document.getElementById(id).addEventListener('input',updateConvert));updateConvert();
