@@ -56,6 +56,22 @@ alter table public.ledger_entries enable row level security;
 alter table public.exchange_rates enable row level security;
 alter table public.mfa_transfer_proofs enable row level security;
 
+-- Couvrir également toute autre table déjà présente dans le schéma public.
+do $rls_all_public$
+declare t record;
+begin
+  for t in select tablename from pg_tables where schemaname = 'public'
+  loop
+    execute format('alter table public.%I enable row level security', t.tablename);
+    execute format('revoke all on table public.%I from anon, authenticated', t.tablename);
+  end loop;
+end
+$rls_all_public$;
+
+-- Empêcher les nouvelles tables créées par ce rôle de recevoir des droits client par défaut.
+alter default privileges in schema public
+  revoke all on tables from anon, authenticated;
+
 -- Supprimer les anciennes politiques sur les tables concernées afin d'éviter
 -- qu'une ancienne politique permissive s'ajoute aux nouvelles.
 do $$
