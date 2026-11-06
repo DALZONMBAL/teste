@@ -128,7 +128,7 @@ function money(value,currency){
 async function displayProfilePhoto(path){
  const img=document.getElementById('profilePhoto'),initials=document.getElementById('profileInitials');
  if(!img)return;
- if(!path){img.removeAttribute('src');img.hidden=true;if(initials)initials.hidden=false;document.querySelectorAll('.avatar').forEach(el=>{el.replaceChildren();});return;}
+ if(!path){img.removeAttribute('src');img.hidden=true;if(initials)initials.hidden=false;const initialText=initials?.textContent||'T';document.querySelectorAll('.avatar').forEach(el=>{el.replaceChildren(document.createTextNode(initialText));});return;}
  const {data,error}=await supabaseClient.storage.from('profile-photos').createSignedUrl(path,3600);
  if(error)throw error;
  const safeUrl=new URL(data.signedUrl);
@@ -145,13 +145,15 @@ document.getElementById('profilePhotoInput')?.addEventListener('change',async e=
  const isPng=bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a;
  const isWebp=bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP';
  if(!(isJpeg||isPng||isWebp)){toast('Le contenu du fichier ne correspond pas à une image autorisée.');e.target.value='';return;}
+ const actualMime=isPng?'image/png':isWebp?'image/webp':'image/jpeg';
+ if(file.type!==actualMime){toast('Le type déclaré ne correspond pas au contenu réel de l’image.');e.target.value='';return;}
  let bitmap;
  try{bitmap=await createImageBitmap(file);if(bitmap.width>4096||bitmap.height>4096)throw new Error('Dimensions trop grandes');}
  catch(err){toast('Image invalide ou dimensions trop grandes.');e.target.value='';return;}
  finally{if(bitmap)bitmap.close();}
  const ext=isPng?'png':isWebp?'webp':'jpg',path=currentUserId+'/avatar.'+ext;
  try{
-  const {error:up}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:file.type});
+  const {error:up}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:actualMime});
   if(up)throw up;
   const {error}=await supabaseClient.rpc('teste_update_profile',{p_full_name:null,p_avatar_path:path,p_update_avatar:true,p_preferences:null});
   if(error)throw error;
@@ -212,6 +214,7 @@ async function loadServerExchangeRate(){
  updateConvert();updateHomeConversion();updateSendQuote();
 }
 async function loadUserData(user){
+ if(!user?.email_confirmed_at){await supabaseClient.auth.signOut();throw new Error('Confirmez votre adresse e-mail avant d’accéder à TESTE.');}
  const [{data:profile,error:profileError},{data:wallets,error:walletError},{data:cards,error:cardError},{data:transfers,error:transferError}]=await Promise.all([
   supabaseClient.from('profiles').select('full_name,account_number,avatar_path,preferences').eq('id',user.id).single(),
   supabaseClient.from('wallets').select('currency,balance_minor').eq('user_id',user.id),
