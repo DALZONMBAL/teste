@@ -202,11 +202,7 @@ function updateSendQuote(){
 [sendAmount,sendFrom,sendTo].forEach(el=>el?.addEventListener('input',updateSendQuote));
 [sendFrom,sendTo].forEach(el=>el?.addEventListener('change',updateSendQuote));
 updateSendQuote();
-document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
- const value='TESTE-SM-2048';
- try{await navigator.clipboard.writeText(value);toast('Identifiant copié');}
- catch(e){toast(value);}
-});
+
 document.querySelectorAll('#activity .activity-row').forEach(row=>row.addEventListener('click',()=>document.getElementById('detailModal')?.classList.add('open')));
 document.getElementById('detailModal')?.addEventListener('click',e=>{if(e.target.id==='detailModal')e.currentTarget.classList.remove('open');});
 try{if(localStorage.getItem('teste-theme')==='dark')document.body.classList.add('dark');}catch(e){}
