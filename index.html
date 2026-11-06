@@ -271,6 +271,8 @@ let authMode='login';
 let currentProfile=null;
 let currentUserId=null;
 let transferHistory=[];
+let pendingTransferMfa=null;
+let pendingTransferKey=null;
 
 function setAuthMode(mode){
  authMode=mode;
@@ -287,8 +289,39 @@ function money(value,currency){
  const n=Number(value||0)/(currency==='USD'?100:1);
  return currency==='USD'?'$ '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):Math.round(n).toLocaleString('fr-FR')+' CDF';
 }
-async function displayProfilePhoto(path){const img=document.getElementById('profilePhoto'),initials=document.getElementById('profileInitials');if(!img)return;if(!path){img.removeAttribute('src');img.hidden=true;if(initials)initials.hidden=false;document.querySelectorAll('.avatar').forEach(el=>{el.style.backgroundImage='';});return;}const {data,error}=await supabaseClient.storage.from('profile-photos').createSignedUrl(path,3600);if(error)throw error;img.src=data.signedUrl;img.hidden=false;if(initials)initials.hidden=true;document.querySelectorAll('.avatar').forEach(el=>{el.textContent='';el.style.backgroundImage='url("'+data.signedUrl+'")';el.style.backgroundSize='cover';el.style.backgroundPosition='center';});}
-document.getElementById('profilePhotoInput')?.addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;if(!currentUserId){toast('Connectez-vous pour modifier votre photo.');return;}if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>3*1024*1024){toast('Image JPG, PNG ou WebP de 3 Mo maximum.');e.target.value='';return;}const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg',path=currentUserId+'/avatar.'+ext;try{const {error:up}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:file.type});if(up)throw up;const {error}=await supabaseClient.rpc('teste_update_profile',{p_full_name:null,p_avatar_path:path,p_update_avatar:true,p_preferences:null});if(error)throw error;currentProfile.avatar_path=path;await displayProfilePhoto(path);toast('Photo de profil mise à jour.');}catch(err){toast('Photo non enregistrée : '+err.message);}finally{e.target.value='';}});
+async function displayProfilePhoto(path){
+ const img=document.getElementById('profilePhoto'),initials=document.getElementById('profileInitials');
+ if(!img)return;
+ if(!path){img.removeAttribute('src');img.hidden=true;if(initials)initials.hidden=false;document.querySelectorAll('.avatar').forEach(el=>{el.replaceChildren();});return;}
+ const {data,error}=await supabaseClient.storage.from('profile-photos').createSignedUrl(path,3600);
+ if(error)throw error;
+ const safeUrl=new URL(data.signedUrl);
+ if(safeUrl.origin!=='https://dswomwtdeuuhojchyykd.supabase.co'||!safeUrl.pathname.includes('/storage/v1/object/sign/profile-photos/'))throw new Error('URL de photo non autorisée');
+ img.src=safeUrl.href;img.hidden=false;if(initials)initials.hidden=true;
+ document.querySelectorAll('.avatar').forEach(el=>{const avatarImage=document.createElement('img');avatarImage.alt='';avatarImage.src=safeUrl.href;avatarImage.style.width='100%';avatarImage.style.height='100%';avatarImage.style.objectFit='cover';avatarImage.style.borderRadius='50%';el.replaceChildren(avatarImage);});
+}
+document.getElementById('profilePhotoInput')?.addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ if(!currentUserId){toast('Connectez-vous pour modifier votre photo.');return;}
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>3*1024*1024){toast('Image JPG, PNG ou WebP de 3 Mo maximum.');e.target.value='';return;}
+ const bytes=new Uint8Array(await file.slice(0,12).arrayBuffer());
+ const isJpeg=bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
+ const isPng=bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a;
+ const isWebp=bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP';
+ if(!(isJpeg||isPng||isWebp)){toast('Le contenu du fichier ne correspond pas à une image autorisée.');e.target.value='';return;}
+ let bitmap;
+ try{bitmap=await createImageBitmap(file);if(bitmap.width>4096||bitmap.height>4096)throw new Error('Dimensions trop grandes');}
+ catch(err){toast('Image invalide ou dimensions trop grandes.');e.target.value='';return;}
+ finally{if(bitmap)bitmap.close();}
+ const ext=isPng?'png':isWebp?'webp':'jpg',path=currentUserId+'/avatar.'+ext;
+ try{
+  const {error:up}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:file.type});
+  if(up)throw up;
+  const {error}=await supabaseClient.rpc('teste_update_profile',{p_full_name:null,p_avatar_path:path,p_update_avatar:true,p_preferences:null});
+  if(error)throw error;
+  currentProfile.avatar_path=path;await displayProfilePhoto(path);toast('Photo de profil mise à jour.');
+ }catch(err){toast('Photo non enregistrée : '+err.message);}finally{e.target.value='';}
+});
 document.getElementById('savePersonal')?.addEventListener('click',async()=>{const name=document.getElementById('personalFullName').value.trim(),email=document.getElementById('personalEmail').value.trim().toLowerCase(),msg=document.getElementById('personalMessage');if(!name||name.length>80){msg.textContent='Saisissez un nom valide.';return;}if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){msg.textContent='Adresse e-mail invalide.';return;}const btn=document.getElementById('savePersonal');btn.disabled=true;try{const {error}=await supabaseClient.rpc('teste_update_profile',{p_full_name:name,p_avatar_path:null,p_update_avatar:false,p_preferences:null});if(error)throw error;currentProfile.full_name=name;const {data:{user}}=await supabaseClient.auth.getUser();if(email!==user.email){const {error:e}=await supabaseClient.auth.updateUser({email});if(e)throw e;msg.textContent='Nom enregistré. Confirmez la nouvelle adresse depuis l’e-mail reçu.';}else msg.textContent='Informations enregistrées.';document.getElementById('profileDisplayName').textContent=name;document.querySelector('.welcome h1').textContent='Bonjour, '+name;document.getElementById('profileInitials').textContent=name.split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();}catch(err){msg.textContent='Enregistrement impossible : '+err.message;}finally{btn.disabled=false;}});
 function loadPreferences(saved){try{const p=saved||JSON.parse(localStorage.getItem('teste-preferences')||'{}');const theme=p.theme||(document.body.classList.contains('dark')?'dark':'light');document.getElementById('prefTheme').value=theme;document.getElementById('prefCurrency').value=p.currency||'USD';document.body.classList.toggle('dark',theme==='dark');}catch(e){}}loadPreferences();
 document.getElementById('savePreferences')?.addEventListener('click',async()=>{const p={theme:document.getElementById('prefTheme').value,currency:document.getElementById('prefCurrency').value,language:'fr'};const msg=document.getElementById('preferencesMessage');try{if(!currentUserId)throw new Error('Connectez-vous pour enregistrer vos préférences.');const {error}=await supabaseClient.rpc('teste_update_profile',{p_full_name:null,p_avatar_path:null,p_update_avatar:false,p_preferences:p});if(error)throw error;currentProfile.preferences=p;try{localStorage.setItem('teste-preferences',JSON.stringify(p));}catch(e){}document.body.classList.toggle('dark',p.theme==='dark');msg.textContent='Préférences enregistrées dans votre compte.';toast('Préférences enregistrées.');}catch(err){msg.textContent='Enregistrement impossible : '+err.message;}});
@@ -296,6 +329,15 @@ document.getElementById('changePassword')?.addEventListener('click',async()=>{co
 async function logoutCurrent(){const {error}=await supabaseClient.auth.signOut();if(error)toast('Déconnexion impossible : '+error.message);}
 document.getElementById('profileLogout')?.addEventListener('click',logoutCurrent);document.getElementById('logoutAll')?.addEventListener('click',logoutCurrent);
 
+async function loadServerExchangeRate(){
+ const {data,error}=await supabaseClient.from('exchange_rates').select('rate').eq('pair','USD_CDF').single();
+ if(error)throw error;
+ const rate=Number(data?.rate);
+ if(!Number.isFinite(rate)||rate<=0)throw new Error('Taux serveur invalide');
+ TESTE_USD_CDF_RATE=rate;
+ document.querySelectorAll('[data-rate-display]').forEach(el=>el.textContent=rate.toLocaleString('fr-FR',{maximumFractionDigits:4}));
+ updateConvert();updateHomeConversion();updateSendQuote();
+}
 async function loadUserData(user){
  const [{data:profile,error:profileError},{data:wallets,error:walletError},{data:cards,error:cardError},{data:transfers,error:transferError}]=await Promise.all([
   supabaseClient.from('profiles').select('full_name,account_number,avatar_path,preferences').eq('id',user.id).single(),
@@ -307,8 +349,10 @@ async function loadUserData(user){
  if(walletError) throw walletError;
  if(cardError) throw cardError;
  if(transferError) throw transferError;
+ try{await loadServerExchangeRate();}catch(rateError){TESTE_USD_CDF_RATE=null;toast('Taux de conversion indisponible depuis le serveur.');}
  currentProfile=profile;
  currentUserId=user.id;
+ refreshMfaStatus().catch(()=>{});
  transferHistory=transfers||[];
  renderTransferHistory(user.id);
  const qrBox=document.getElementById('receiveQr');
@@ -319,7 +363,7 @@ async function loadUserData(user){
  if(welcomeTitle)welcomeTitle.textContent='Bonjour, '+name;
  const profileName=document.getElementById('profileDisplayName');if(profileName)profileName.textContent=name;
  const initialsEl=document.getElementById('profileInitials');if(initialsEl)initialsEl.textContent=initials||'T';
- document.querySelectorAll('.avatar').forEach(el=>{el.textContent=initials||'T';el.style.backgroundImage='';});
+ document.querySelectorAll('.avatar').forEach(el=>{el.replaceChildren(document.createTextNode(initials||'T'));});
  const profileSub=document.getElementById('profileAccountLine');if(profileSub)profileSub.textContent='Compte TESTE · '+profile.account_number;
  const emailLine=document.getElementById('profileEmailLine');if(emailLine)emailLine.textContent=user.email||'';
  const personalName=document.getElementById('personalFullName');if(personalName)personalName.value=name;
@@ -377,6 +421,7 @@ authSubmit.addEventListener('click',async()=>{
   }else{
    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
    if(error)throw error;
+   if(!data.user?.email_confirmed_at){await supabaseClient.auth.signOut();throw new Error('Confirmez votre adresse e-mail avant de continuer.');}
    await loadUserData(data.user);
    toast('Connexion réussie');
   }
