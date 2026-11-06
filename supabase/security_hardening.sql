@@ -397,7 +397,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $teste_trigger$
 declare
   v_account text;
 begin
@@ -427,7 +427,7 @@ begin
 
   return new;
 end;
-$;
+$teste_trigger$;
 revoke all on function public.teste_handle_new_user() from public, anon, authenticated;
 
 commit;
