@@ -1,7 +1,7 @@
 {
   "name": "TESTE — Votre argent en mouvement",
   "short_name": "TESTE",
-  "description": "Maquette mobile de l'application TESTE.",
+  "description": "Une expérience mobile pour explorer les comptes, les devises et l’activité TESTE.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
