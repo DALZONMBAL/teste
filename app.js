@@ -298,6 +298,18 @@ document.getElementById('openAuth')?.addEventListener('click',()=>{authScreen.cl
 document.getElementById('closeAuth').addEventListener('click',()=>{authScreen.classList.remove('open');welcomeScreen.style.display='flex'});
 loginTab.addEventListener('click',()=>setAuthMode('login'));
 signupTab.addEventListener('click',()=>setAuthMode('signup'));
+document.getElementById('googleAuth')?.addEventListener('click',async()=>{
+ const button=document.getElementById('googleAuth');
+ button.disabled=true;authMessage.textContent='Ouverture de Google…';
+ try{
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await supabaseClient.auth.signInWithOAuth({provider:'google',options:{redirectTo}});
+  if(error)throw error;
+ }catch(e){
+  authMessage.textContent='Connexion Google indisponible : '+(e.message||'vérifiez la configuration du fournisseur Google.');
+  button.disabled=false;
+ }
+});
 authSubmit.addEventListener('click',async()=>{
  const email=document.getElementById('localEmail').value.trim().toLowerCase();
  const password=document.getElementById('localPassword').value;
