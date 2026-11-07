@@ -1,6 +1,25 @@
 
 const navButtons=[...document.querySelectorAll('[data-screen]')];
-function showScreen(id){const target=document.getElementById(id);if(!target||!target.classList.contains('screen')){console.warn('Écran TESTE introuvable :',id);return false;}document.querySelectorAll('.screen').forEach(screen=>{const active=screen===target;screen.classList.toggle('active',active);screen.style.display=active?'block':'none';screen.setAttribute('aria-hidden',String(!active));});document.querySelectorAll('[data-screen]').forEach(button=>button.classList.toggle('active',button.dataset.screen===id));document.documentElement.scrollTop=0;document.body.scrollTop=0;window.scrollTo({top:0,left:0,behavior:'auto'});return true;}
+function showScreen(id){
+ const target=document.getElementById(id);
+ if(!target||!target.classList.contains('screen')){console.warn('Écran TESTE introuvable :',id);return false;}
+ document.querySelectorAll('.screen').forEach(screen=>{
+  const active=screen===target;
+  screen.classList.toggle('active',active);
+  screen.style.display=active?'block':'none';
+  screen.setAttribute('aria-hidden',String(!active));
+ });
+ navButtons.forEach(button=>{
+  const active=button.dataset.screen===id;
+  button.classList.toggle('active',active);
+  if(active)button.setAttribute('aria-current','page');
+  else button.removeAttribute('aria-current');
+ });
+ document.documentElement.scrollTop=0;
+ document.body.scrollTop=0;
+ window.scrollTo({top:0,left:0,behavior:'auto'});
+ return true;
+}
 document.addEventListener('click',event=>{const button=event.target.closest('[data-go]');if(!button)return;event.preventDefault();showScreen(button.dataset.go);});
 navButtons.forEach(button=>button.addEventListener('click',()=>showScreen(button.dataset.screen)));
 let hidden=false;let lastBalanceText='$ 0.00';document.getElementById('toggleBalance').addEventListener('click',()=>{hidden=!hidden;const el=document.getElementById('balance');el.textContent=hidden?'••••••':lastBalanceText;});
@@ -261,13 +280,13 @@ async function loadUserData(user){
  if(accountCards[0])accountCards[0].textContent=money(usd,'USD');
  if(accountCards[1])accountCards[1].textContent=money(cdf,'CDF');
  const cardRef=cards?.[0]?.card_reference||'Référence indisponible';
- document.querySelectorAll('.mini-card .card-bottom small').forEach(el=>{el.textContent='CARTE DE TEST';});
+ document.querySelectorAll('.mini-card .card-bottom small').forEach(el=>{el.textContent='CARTE TESTE';});
  const cardDetails=document.querySelector('#cards .mini-card .card-bottom strong');
  if(cardDetails)cardDetails.textContent=cardRef;
  const homeCard=document.querySelector('#home .mini-card .card-bottom strong');
  if(homeCard)homeCard.textContent=cardRef;
- document.querySelectorAll('.account-foot')[0].textContent='N° '+profile.account_number+' · Solde de test';
- document.querySelectorAll('.account-foot')[1].textContent='Portefeuille de test';
+ document.querySelectorAll('.account-foot')[0].textContent='N° '+profile.account_number+' · Solde TESTE';
+ document.querySelectorAll('.account-foot')[1].textContent='Compte TESTE';
  welcomeScreen.style.display='none';
  authScreen.classList.remove('open');
  showScreen('home');
@@ -356,7 +375,7 @@ document.getElementById('closeQrScanner')?.addEventListener('click',async()=>{
 const recipientInput=document.querySelector('#send input[placeholder="Nom ou adresse e-mail"]');
 if(recipientInput){recipientInput.id='recipientAccount';recipientInput.placeholder='Numéro de compte TESTE';}
 const transferButton=document.querySelector('#send button.primary-btn');
-if(transferButton){transferButton.removeAttribute('data-toast');transferButton.id='sendTransferBtn';transferButton.textContent='Effectuer le transfert de test';}
+if(transferButton){transferButton.removeAttribute('data-toast');transferButton.id='sendTransferBtn';transferButton.textContent='Confirmer dans TESTE';}
 document.getElementById('sendTransferBtn')?.addEventListener('click',async()=>{
  const recipient=document.getElementById('recipientAccount')?.value.trim().toUpperCase();
  const amount=Number(document.getElementById('sendAmount')?.value||0);
@@ -392,7 +411,7 @@ document.getElementById('sendTransferBtn')?.addEventListener('click',async()=>{
   });
   if(error)throw error;
   pendingTransferMfa=null;pendingTransferKey=null;mfaCode.value='';mfaPanel.hidden=true;
-  toast('Transfert de test enregistré · '+String(data).slice(0,8));
+  toast('Opération enregistrée dans TESTE · '+String(data).slice(0,8));
   if(currentProfile){
    const {data:{user}}=await supabaseClient.auth.getUser();
    if(user){try{await loadUserData(user);}catch(refreshError){toast('Transfert enregistré. Actualisation des soldes impossible pour le moment.');}}
@@ -405,41 +424,4 @@ document.getElementById('sendTransferBtn')?.addEventListener('click',async()=>{
 document.getElementById('copyReceiveId')?.addEventListener('click',async()=>{
  const value=currentProfile?.account_number||'Connectez-vous pour afficher votre numéro';
  try{await navigator.clipboard.writeText(value);toast('Numéro de compte copié');}catch(e){toast(value);}
-});
-
-// Retraits Mobile Money : écriture comptable interne vers le compte central TESTE.
-let pendingWithdrawalRequest=null;
-document.getElementById('withdrawSubmit')?.addEventListener('click',async()=>{
- const operator=document.querySelector('input[name="withdrawOperator"]:checked')?.value;
- const phone=(document.getElementById('withdrawPhone')?.value||'').replace(/[\s().-]/g,'');
- const amount=Number(document.getElementById('withdrawAmount')?.value||0);
- const currency=document.getElementById('withdrawCurrency')?.value;
- const button=document.getElementById('withdrawSubmit');
- const errorBox=document.getElementById('withdrawError');
- const success=document.getElementById('withdrawSuccess');
- if(errorBox){errorBox.hidden=true;errorBox.textContent='';}
- if(success)success.hidden=true;
- if(!currentUserId){toast('Connectez-vous pour effectuer un retrait.');return;}
- if(!/^\+?[0-9]{9,15}$/.test(phone)){toast('Saisissez un numéro valide.');return;}
- if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant valide.');return;}
- const amountMinor=Math.round(amount*(currency==='USD'?100:1));
- const fingerprint=[operator,phone,amountMinor,currency].join('|');
- if(!pendingWithdrawalRequest||pendingWithdrawalRequest.fingerprint!==fingerprint){pendingWithdrawalRequest={fingerprint,key:crypto.randomUUID()};}
- button.disabled=true;
- try{
-  const {data,error}=await supabaseClient.rpc('teste_mobile_money_withdrawal',{p_operator:operator,p_phone_number:phone,p_amount_minor:amountMinor,p_currency:currency,p_idempotency_key:pendingWithdrawalRequest.key});
-  if(error)throw error;
-  pendingWithdrawalRequest=null;
-  const labels={airtel_money:'Airtel Money',orange_money:'Orange Money',mpesa:'M-Pesa'};
-  document.getElementById('withdrawReceiptOperator').textContent=labels[operator]||operator;
-  document.getElementById('withdrawReceiptAmount').textContent=money(amountMinor,currency);
-  if(success)success.hidden=false;
-  toast('Retrait enregistré dans le registre TESTE.');
-  const {data:{user}}=await supabaseClient.auth.getUser();
-  if(user){try{await loadUserData(user);showScreen('withdraw');}catch(refreshError){showScreen('withdraw');toast('Retrait enregistré. Actualisation des soldes impossible.');}}
- }catch(e){
-  const reason=e?.message||'Retrait refusé.';
-  if(errorBox){errorBox.textContent=reason;errorBox.hidden=false;}
-  toast(reason);
- }finally{button.disabled=false;}
 });
