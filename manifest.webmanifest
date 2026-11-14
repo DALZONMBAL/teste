@@ -1,7 +1,7 @@
 {
-  "name": "TESTE — Votre argent en mouvement",
+  "name": "TESTE — Interface mobile",
   "short_name": "TESTE",
-  "description": "Une expérience mobile pour explorer les comptes, les devises et l’activité TESTE.",
+  "description": "Maquette mobile éducative pour découvrir les écrans de comptes, de devises et d’activité.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
