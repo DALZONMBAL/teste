@@ -597,7 +597,7 @@ sendButton?.addEventListener('click',()=>{
   const preview=$('sendPreview');
   if(preview){
     preview.hidden=false;
-    preview.scrollIntoView({behavior:'smooth',block:'nearest'});
+    preview.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
   }
   toast('Aperçu prêt.');
 });
@@ -609,6 +609,7 @@ $('openQrScanner')?.addEventListener('click',async()=>{
   panel.hidden=false;
   if(qrScanner?.isScanning) return;
   if(!window.Html5Qrcode){
+    panel.hidden=true;
     toast('Lecture QR indisponible. Saisissez l’identifiant.');
     return;
   }
