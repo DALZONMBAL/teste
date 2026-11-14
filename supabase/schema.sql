@@ -1,10 +1,10 @@
--- TESTE — maquette éducative.
--- Aucune table publique de portefeuille, de carte, de solde ou d’historique
--- n’est nécessaire au fonctionnement de l’interface.
+-- TESTE — schéma de base de la maquette éducative.
 --
--- Les comptes sont gérés par Supabase Auth.
--- Les montants, conversions, identifiants et exemples d’activité sont affichés
--- localement par app.js et ne sont pas envoyés à la base de données.
+-- Aucune table publique n’est requise pour l’interface :
+-- - Supabase Auth gère l’inscription, la connexion et les sessions.
+-- - Les montants, devises, conversions et exemples d’activité sont locaux.
+-- - Les parcours d’envoi et de réception ne transmettent aucune opération.
+-- - Aucune donnée de carte ou donnée bancaire n’est demandée.
 --
--- Exécuter supabase/security_hardening.sql pour préparer le stockage privé
--- facultatif des photos de profil et désactiver les anciennes fonctions.
+-- Pour le stockage privé facultatif des photos de profil et le verrouillage
+-- des anciennes tables/fonctions, exécuter supabase/security_hardening.sql.
