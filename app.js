@@ -343,7 +343,7 @@ async function loadUserData(user){
   const personalEmail=$('personalEmail');
   if(personalEmail) personalEmail.value=user.email||'';
   document.querySelectorAll('.avatar').forEach(el=>el.textContent=initials);
-  const welcomeTitle=$('.welcome h1');
+  const welcomeTitle=document.querySelector('.welcome h1');
   if(welcomeTitle) welcomeTitle.textContent='Bonjour, '+name;
   setDemoId(user);
   renderDemoAccounts();
@@ -518,7 +518,8 @@ $('savePersonal')?.addEventListener('click',async()=>{
     currentProfile.full_name=name;
     setText('profileDisplayName',name);
     setText('profileInitials',initialsFor(name));
-    const welcomeTitle=$('.welcome h1');
+    document.querySelectorAll('.avatar').forEach(el=>el.textContent=initialsFor(name));
+    const welcomeTitle=document.querySelector('.welcome h1');
     if(welcomeTitle) welcomeTitle.textContent='Bonjour, '+name;
     if(email!==user.email) message.textContent='Nom enregistré. Confirmez la nouvelle adresse depuis l’e-mail reçu.';
     else message.textContent='Informations enregistrées.';
