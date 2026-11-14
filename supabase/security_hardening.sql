@@ -35,7 +35,7 @@ for insert to authenticated
 with check (
   bucket_id='profile-photos'
   and (storage.foldername(name))[1]=(select auth.uid())::text
-  and lower(name) ~ '\\.(jpg|jpeg|png|webp)$'
+  and lower(name) ~ '\.(jpg|jpeg|png|webp)$'
   and coalesce(metadata->>'mimetype','') in ('image/jpeg','image/png','image/webp')
   and coalesce((metadata->>'size')::bigint,0) between 1 and 3145728
 );
@@ -49,7 +49,7 @@ using (
 with check (
   bucket_id='profile-photos'
   and (storage.foldername(name))[1]=(select auth.uid())::text
-  and lower(name) ~ '\\.(jpg|jpeg|png|webp)$'
+  and lower(name) ~ '\.(jpg|jpeg|png|webp)$'
   and coalesce(metadata->>'mimetype','') in ('image/jpeg','image/png','image/webp')
   and coalesce((metadata->>'size')::bigint,0) between 1 and 3145728
 );
