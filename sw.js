@@ -1,4 +1,4 @@
-const CACHE='teste-shell-v22';
+const CACHE='teste-shell-v23';
 const ASSETS=['./index.html','./manifest.webmanifest','./icon.svg','./app.js'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));
