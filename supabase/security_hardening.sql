@@ -215,207 +215,14 @@ $$;
 revoke all on function public.teste_update_profile(text,text,boolean,jsonb) from public, anon;
 grant execute on function public.teste_update_profile(text,text,boolean,jsonb) to authenticated;
 
--- 7) Fonction de transfert atomique.
--- Exige e-mail confirmé + AAL2 + preuve TOTP récente (90 secondes).
--- Le client ne fournit jamais de solde, de frais ou de taux de change.
-create or replace function public.teste_send_simulated_transfer(
-  p_recipient_account text,
-  p_amount_minor bigint,
-  p_currency text,
-  p_idempotency_key uuid
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = ''
-as $$
-declare
-  v_sender uuid := auth.uid();
-  v_recipient uuid;
-  v_sender_account text;
-  v_sender_wallet uuid;
-  v_recipient_wallet uuid;
-  v_sender_balance bigint;
-  v_transfer uuid;
-  v_email_confirmed_at timestamptz;
-  v_daily_total bigint;
-  v_max_transaction bigint;
-  v_daily_limit bigint;
-  v_totp_timestamp bigint;
-  v_exchange_rate numeric(18,6);
-begin
-  if v_sender is null then
-    raise exception 'Authentication required';
-  end if;
+-- 7) Aucun traitement de transfert n’est défini pour cette maquette.
 
-  select u.email_confirmed_at into v_email_confirmed_at
-  from auth.users u where u.id = v_sender;
-  if v_email_confirmed_at is null then
-    raise exception 'Email confirmation required';
-  end if;
-
-  if coalesce(auth.jwt()->>'aal','aal1') <> 'aal2' then
-    raise exception 'MFA verification required';
-  end if;
-
-  select pg_catalog.max((factors.item->>'timestamp')::bigint)
-    into v_totp_timestamp
-  from pg_catalog.jsonb_array_elements(
-    coalesce(auth.jwt()->'amr','[]'::jsonb)
-  ) as factors(item)
-  where factors.item->>'method' = 'totp'
-    and pg_catalog.jsonb_typeof(factors.item->'timestamp') = 'number';
-
-  if v_totp_timestamp is null or v_totp_timestamp <
-     pg_catalog.floor(pg_catalog.date_part('epoch', pg_catalog.now()))::bigint - 90 then
-    raise exception 'A fresh TOTP code is required for each transfer';
-  end if;
-
-  if p_recipient_account is null or
-     p_recipient_account !~* '^TST[A-Z0-9]{10}$' then
-    raise exception 'Invalid recipient account';
-  end if;
-  if p_amount_minor is null or p_amount_minor <= 0 then
-    raise exception 'Invalid test amount';
-  end if;
-  if p_currency is null or p_currency not in ('USD','CDF') then
-    raise exception 'Unsupported currency';
-  end if;
-  if p_idempotency_key is null then
-    raise exception 'Idempotency key required';
-  end if;
-
-  -- Consommer une seule fois la preuve TOTP de cette session.
-  insert into public.mfa_transfer_proofs(user_id,proof_timestamp)
-  values (v_sender,v_totp_timestamp)
-  on conflict (user_id,proof_timestamp) do nothing;
-  if not found then
-    raise exception 'This MFA proof has already authorized an operation';
-  end if;
-
-  -- Les plafonds CDF sont calculés avec le taux stocké côté serveur.
-  select r.rate into v_exchange_rate
-  from public.exchange_rates r where r.pair = 'USD_CDF';
-  if v_exchange_rate is null or v_exchange_rate <= 0 then
-    raise exception 'Server exchange rate unavailable';
-  end if;
-  v_max_transaction := case when p_currency = 'USD'
-    then 100000 else pg_catalog.round(v_exchange_rate * 1000)::bigint end;
-  v_daily_limit := case when p_currency = 'USD'
-    then 500000 else pg_catalog.round(v_exchange_rate * 5000)::bigint end;
-  if p_amount_minor > v_max_transaction then
-    raise exception 'Per-transfer test limit exceeded';
-  end if;
-
-  -- La clé d'idempotence bloque les répétitions/reprises de la même requête.
-  select t.id into v_transfer
-  from public.transfers t
-  where t.sender_id = v_sender and t.idempotency_key = p_idempotency_key;
-  if v_transfer is not null then
-    update public.mfa_transfer_proofs
-    set transfer_id = v_transfer
-    where user_id = v_sender and proof_timestamp = v_totp_timestamp;
-    return v_transfer;
-  end if;
-
-  select p.id into v_recipient
-  from public.profiles p
-  where p.account_number = pg_catalog.upper(pg_catalog.btrim(p_recipient_account));
-  if v_recipient is null then
-    raise exception 'Recipient account not found';
-  end if;
-  if v_recipient = v_sender then
-    raise exception 'Cannot transfer to the same account';
-  end if;
-
-  select p.account_number into v_sender_account
-  from public.profiles p where p.id = v_sender;
-
-  select w.id into v_sender_wallet
-  from public.wallets w where w.user_id = v_sender and w.currency = p_currency;
-  select w.id into v_recipient_wallet
-  from public.wallets w where w.user_id = v_recipient and w.currency = p_currency;
-  if v_sender_wallet is null or v_recipient_wallet is null then
-    raise exception 'Wallet not found';
-  end if;
-
-  -- Verrouiller les deux portefeuilles dans un ordre stable.
-  perform w.id
-  from public.wallets w
-  where w.id in (v_sender_wallet, v_recipient_wallet)
-  order by w.id
-  for update;
-
-  select w.balance_minor into v_sender_balance
-  from public.wallets w where w.id = v_sender_wallet;
-  if v_sender_balance < p_amount_minor then
-    raise exception 'Insufficient simulated balance';
-  end if;
-
-  select coalesce(pg_catalog.sum(t.amount_minor),0)::bigint into v_daily_total
-  from public.transfers t
-  where t.sender_id = v_sender
-    and t.currency = p_currency
-    and t.created_at >= pg_catalog.date_trunc('day', pg_catalog.now());
-
-  if v_daily_total + p_amount_minor > v_daily_limit then
-    raise exception 'Daily test limit exceeded';
-  end if;
-
-  insert into public.transfers(
-    sender_id, recipient_id, sender_account, recipient_account,
-    currency, amount_minor, idempotency_key
-  )
-  values (
-    v_sender, v_recipient, v_sender_account,
-    pg_catalog.upper(pg_catalog.btrim(p_recipient_account)),
-    p_currency, p_amount_minor, p_idempotency_key
-  )
-  on conflict (sender_id, idempotency_key) do nothing
-  returning id into v_transfer;
-
-  if v_transfer is null then
-    select t.id into v_transfer from public.transfers t
-    where t.sender_id = v_sender and t.idempotency_key = p_idempotency_key;
-    return v_transfer;
-  end if;
-
-  update public.wallets
-  set balance_minor = balance_minor - p_amount_minor
-  where id = v_sender_wallet;
-
-  update public.wallets
-  set balance_minor = balance_minor + p_amount_minor
-  where id = v_recipient_wallet;
-
-  update public.mfa_transfer_proofs
-  set transfer_id = v_transfer
-  where user_id = v_sender and proof_timestamp = v_totp_timestamp;
-
-  insert into public.ledger_entries(
-    transfer_id,user_id,wallet_id,entry_type,currency,amount_minor
-  ) values
-    (v_transfer,v_sender,v_sender_wallet,'debit',p_currency,p_amount_minor),
-    (v_transfer,v_recipient,v_recipient_wallet,'credit',p_currency,p_amount_minor);
-
-  insert into public.security_events(user_id,event_type,details)
-  values
-    (v_sender,'simulated_transfer_sent',
-     pg_catalog.jsonb_build_object('transfer_id',v_transfer,'currency',p_currency)),
-    (v_recipient,'simulated_transfer_received',
-     pg_catalog.jsonb_build_object('transfer_id',v_transfer,'currency',p_currency));
-
-  return v_transfer;
-end;
-$$;
-revoke all on function public.teste_send_simulated_transfer(text,bigint,text,uuid) from public, anon;
-grant execute on function public.teste_send_simulated_transfer(text,bigint,text,uuid) to authenticated;
-
--- 8) Le taux est consultable par les comptes connectés, jamais modifiable par eux.
+-- 8) Le taux de présentation est défini localement dans app.js.
+-- Aucune lecture de taux ni donnée financière n’est nécessaire côté serveur.
 revoke all on table public.exchange_rates from anon, authenticated;
-grant select on table public.exchange_rates to authenticated;
 
--- 9) Déclencheur d'inscription : chemin de recherche vide et objets qualifiés.
+-- 9) À l’inscription, ne créer qu’un identifiant de présentation.
+-- Aucun portefeuille ni référence de carte n’est initialisé.
 create or replace function public.teste_handle_new_user()
 returns trigger
 language plpgsql
@@ -425,37 +232,18 @@ as $teste_trigger$
 declare
   v_account text;
 begin
-  loop
-    v_account := 'TST' || pg_catalog.upper(
-      pg_catalog.substr(
-        pg_catalog.replace(pg_catalog.gen_random_uuid()::text, '-', ''), 1, 10
-      )
-    );
-    exit when not exists (
-      select 1 from public.profiles p where p.account_number = v_account
-    );
-  end loop;
+  v_account := 'TST' || pg_catalog.upper(
+    pg_catalog.substr(pg_catalog.replace(pg_catalog.gen_random_uuid()::text, '-', ''), 1, 10)
+  );
 
   insert into public.profiles(id,full_name,account_number)
   values (new.id,coalesce(new.raw_user_meta_data->>'full_name',''),v_account)
   on conflict (id) do nothing;
 
-  insert into public.wallets(user_id,currency,balance_minor)
-  values (new.id,'USD',0),(new.id,'CDF',0)
-  on conflict (user_id,currency) do nothing;
-
-  insert into public.test_cards(user_id,card_reference)
-  values (new.id,'TST-CARD-' || pg_catalog.upper(
-    pg_catalog.substr(pg_catalog.replace(pg_catalog.gen_random_uuid()::text,'-',''),1,10)
-  ));
-
   return new;
 end;
 $teste_trigger$;
 revoke all on function public.teste_handle_new_user() from public, anon, authenticated;
-
-commit;
-
 
 -- 10) Vérification après migration : toutes les tables de TESTE doivent afficher rowsecurity = true.
 select n.nspname as schemaname, c.relname as tablename,
@@ -466,5 +254,28 @@ where n.nspname = 'public'
   and c.relkind = 'r'
 order by c.relname;
 
--- Pour modifier le taux indicatif, exécuter manuellement dans SQL Editor :
--- update public.exchange_rates set rate = 2850, updated_at = now() where pair = 'USD_CDF';
+-- Le taux d’exemple est affiché localement par l’interface ; aucune cotation en direct n’est utilisée.
+
+-- 11) Mode maquette : désactiver les anciennes fonctions et tables financières.
+begin;
+drop function if exists public.teste_send_simulated_transfer(text,bigint,text,uuid);
+drop function if exists public.teste_update_profile(text,text,boolean,jsonb);
+do $design_only$
+declare
+  v_table text;
+begin
+  foreach v_table in array array[
+    'profiles','wallets','test_cards','transfers','security_events',
+    'ledger_entries','exchange_rates','mfa_transfer_proofs'
+  ]
+  loop
+    if to_regclass('public.' || v_table) is not null then
+      execute format('revoke all on table public.%I from anon, authenticated',v_table);
+    end if;
+  end loop;
+end
+$design_only$;
+commit;
+
+-- Les anciennes lignes de démonstration ne sont pas supprimées.
+-- Elles ne sont plus accessibles au client et ne sont plus utilisées par l’application.
