@@ -1,6 +1,7 @@
--- TESTE — Supabase schema for a SCHOOL TEST ENVIRONMENT.
--- All balances and transfers are simulated. No real payment rails or bank cards.
--- Run this base file first, then supabase/security_hardening.sql. Never put a service_role key in the frontend.
+-- TESTE — schéma de base pour une maquette éducative.
+-- Les écrans de devises et d’opérations sont des aperçus locaux uniquement.
+-- Exécuter ensuite supabase/security_hardening.sql puis supabase/design_only.sql.
+-- Ne jamais placer une clé service_role dans le code du navigateur.
 
 create extension if not exists pgcrypto;
 
@@ -59,66 +60,42 @@ create index if not exists transfers_sender_idx on public.transfers(sender_id, c
 create index if not exists transfers_recipient_idx on public.transfers(recipient_id, created_at desc);
 create index if not exists security_events_user_idx on public.security_events(user_id, created_at desc);
 
--- Create profile, two simulated wallets and one non-payment card reference
--- automatically whenever a user signs up through Supabase Auth.
+-- Créer uniquement un profil de présentation à l’inscription.
+-- Aucun portefeuille, carte ou historique d’opérations n’est alimenté.
 create or replace function public.teste_handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_account text;
 begin
-  loop
-    v_account := 'TST' || pg_catalog.upper(
-      pg_catalog.substr(pg_catalog.replace(pg_catalog.gen_random_uuid()::text, '-', ''), 1, 10)
-    );
-    exit when not exists (
-      select 1 from public.profiles p where p.account_number = v_account
-    );
-  end loop;
+  v_account := 'TST' || pg_catalog.upper(
+    pg_catalog.substr(pg_catalog.replace(pg_catalog.gen_random_uuid()::text, '-', ''), 1, 10)
+  );
 
   insert into public.profiles(id, full_name, account_number)
   values (new.id, coalesce(new.raw_user_meta_data->>'full_name',''), v_account)
   on conflict (id) do nothing;
 
-  insert into public.wallets(user_id, currency, balance_minor)
-  values (new.id, 'USD', 0), (new.id, 'CDF', 0)
-  on conflict (user_id, currency) do nothing;
-
-  insert into public.test_cards(user_id, card_reference)
-  values (new.id, 'TST-CARD-' || pg_catalog.upper(
-    pg_catalog.substr(pg_catalog.replace(pg_catalog.gen_random_uuid()::text, '-', ''), 1, 10)
-  ));
-
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists teste_auth_user_created on auth.users;
 create trigger teste_auth_user_created
 after insert on auth.users
 for each row execute procedure public.teste_handle_new_user();
 
--- Backfill accounts for users who already existed before this trigger was installed.
+-- Backfill des seuls profils déjà présents avant l’installation du déclencheur.
+
 insert into public.profiles(id, full_name, account_number)
 select u.id, coalesce(u.raw_user_meta_data->>'full_name',''),
        'TST' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10))
 from auth.users u
 where not exists (select 1 from public.profiles p where p.id = u.id)
 on conflict (id) do nothing;
-
-insert into public.wallets(user_id, currency, balance_minor)
-select u.id, c.currency, 0
-from auth.users u
-cross join (values ('USD'),('CDF')) as c(currency)
-on conflict (user_id, currency) do nothing;
-
-insert into public.test_cards(user_id, card_reference)
-select u.id, 'TST-CARD-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10))
-from auth.users u
-where not exists (select 1 from public.test_cards c where c.user_id = u.id);
 
 alter table public.profiles enable row level security;
 alter table public.wallets enable row level security;
@@ -148,10 +125,8 @@ drop policy if exists "security_events_read_own" on public.security_events;
 create policy "security_events_read_own" on public.security_events
 for select to authenticated using (user_id = (select auth.uid()));
 
--- Le RPC de transfert n'est volontairement pas défini ici.
--- Exécuter immédiatement supabase/security_hardening.sql : cette migration
--- crée le RPC protégé par MFA récent, e-mail confirmé, limites et registre.
+-- Aucun RPC de transfert n’est prévu dans cette maquette.
+-- Le fichier design_only.sql verrouille les anciennes tables de démonstration.
 
 -- Remove default table privileges from anon/authenticated; SELECT is governed by RLS.
 revoke all on public.profiles, public.wallets, public.test_cards, public.transfers, public.security_events from anon, authenticated;
-grant select on public.profiles, public.wallets, public.test_cards, public.transfers, public.security_events to authenticated;
