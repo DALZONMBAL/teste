@@ -227,4 +227,10 @@ commit;
 -- where email = 'ADRESSE_EMAIL_DU_PROPRIETAIRE';
 -- Puis configurer les soldes initiaux (exemple : 100 USD et 230000 CDF) :
 -- select public.teste_admin_set_opening(10000,230000,2300);
--- Les soldes initiaux ne sont appliqués qu'aux nouveaux comptes après la configuration.
+-- À exécuter UNE SEULE FOIS si vous voulez créditer les comptes déjà existants
+-- avec les montants de départ configurés (cela remplace leurs soldes actuels) :
+-- update public.teste_wallets w
+-- set balance_minor = case when w.currency='USD' then s.opening_usd_cents else s.opening_cdf end,
+--     updated_at = now()
+-- from public.teste_settings s where s.id=true;
+-- Les nouveaux comptes reçoivent automatiquement les montants configurés.
