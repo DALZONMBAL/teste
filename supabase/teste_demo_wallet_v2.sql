@@ -202,9 +202,24 @@ revoke all on public.teste_settings,public.teste_profiles,public.teste_wallets,p
 grant select on public.teste_profiles,public.teste_wallets,public.teste_transfers,public.teste_cards to authenticated;
 grant select,update on public.teste_notifications to authenticated;
 grant execute on function public.teste_demo_send(text,numeric,text,text) to authenticated;
-grant execute on function public.teste_admin_set_opening(bigint,bigint,numeric) to authenticated;\ngrant execute on function public.teste_demo_toggle_card(boolean) to authenticated;
+grant execute on function public.teste_admin_set_opening(bigint,bigint,numeric) to authenticated;
+grant execute on function public.teste_demo_toggle_card(boolean) to authenticated;
 revoke all on function public.teste_create_user_data() from public,anon,authenticated;
 revoke all on function public.teste_is_admin() from public,anon;
+
+-- Publication Realtime pour actualiser les portefeuilles et notifications ouverts.
+do $realtime$
+declare t text;
+begin
+ if exists(select 1 from pg_publication where pubname='supabase_realtime') then
+  foreach t in array array['teste_wallets','teste_transfers','teste_notifications','teste_cards'] loop
+   if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename=t) then
+    execute format('alter publication supabase_realtime add table public.%I',t);
+   end if;
+  end loop;
+ end if;
+end
+$realtime$;
 commit;
 
 -- Après installation, attribuer le rôle admin au compte propriétaire depuis SQL Editor :
