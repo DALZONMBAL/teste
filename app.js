@@ -365,6 +365,8 @@ async function loadUserData(user){
   renderDemoAccounts();
   renderTransferHistory();
   loadPreferences();
+  await refreshDemoData();
+  startWalletRealtime();
   try{await displayProfilePhoto(currentProfile.avatar_path);}catch(error){console.warn('Photo de profil indisponible.',error);}
   welcomeScreen.style.display='none';
   authScreen.classList.remove('open');
