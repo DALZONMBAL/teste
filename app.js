@@ -831,3 +831,22 @@ $('toggleDemoCard')?.addEventListener('click',async()=>{
   }catch(error){toast(error.message||'Action indisponible. Vérifiez la migration SQL.');}
   finally{button.disabled=false;}
 });
+
+function startWalletRealtime(){
+  if(!supabaseClient||!currentUserId)return;
+  if(walletRefreshChannel){supabaseClient.removeChannel(walletRefreshChannel);walletRefreshChannel=null;}
+  walletRefreshChannel=supabaseClient.channel('teste-live-'+currentUserId)
+    .on('postgres_changes',{event:'*',schema:'public',table:'teste_wallets',filter:'user_id=eq.'+currentUserId},()=>refreshDemoData())
+    .on('postgres_changes',{event:'*',schema:'public',table:'teste_notifications',filter:'user_id=eq.'+currentUserId},()=>refreshDemoData())
+    .on('postgres_changes',{event:'*',schema:'public',table:'teste_cards',filter:'user_id=eq.'+currentUserId},()=>refreshDemoData())
+    .subscribe();
+}
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&currentUserId)refreshDemoData();
+});
+supabaseClient?.auth.onAuthStateChange(event=>{
+  if(event==='SIGNED_OUT'&&walletRefreshChannel){
+    supabaseClient.removeChannel(walletRefreshChannel);
+    walletRefreshChannel=null;
+  }
+});
