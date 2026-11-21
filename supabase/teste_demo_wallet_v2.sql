@@ -165,6 +165,20 @@ begin
  usd_cdf_rate=coalesce(p_rate,usd_cdf_rate),updated_at=now() where id=true;
 end $$;
 
+create or replace function public.teste_demo_toggle_card(p_locked boolean)
+returns text language plpgsql security definer set search_path=public,auth
+as $
+declare v_status text;
+begin
+ if auth.uid() is null then raise exception 'Connectez-vous.'; end if;
+ update public.teste_cards set status=case when p_locked then 'locked' else 'active' end
+ where user_id=auth.uid() returning status into v_status;
+ if v_status is null then raise exception 'Carte de démonstration introuvable.'; end if;
+ insert into public.teste_notifications(user_id,title,body)
+ values(auth.uid(),'Carte mise à jour',case when p_locked then 'Votre carte de démonstration est verrouillée.' else 'Votre carte de démonstration est activée.' end);
+ return v_status;
+end $;
+
 alter table public.teste_profiles enable row level security;
 alter table public.teste_wallets enable row level security;
 alter table public.teste_transfers enable row level security;
@@ -188,7 +202,7 @@ revoke all on public.teste_settings,public.teste_profiles,public.teste_wallets,p
 grant select on public.teste_profiles,public.teste_wallets,public.teste_transfers,public.teste_cards to authenticated;
 grant select,update on public.teste_notifications to authenticated;
 grant execute on function public.teste_demo_send(text,numeric,text,text) to authenticated;
-grant execute on function public.teste_admin_set_opening(bigint,bigint,numeric) to authenticated;
+grant execute on function public.teste_admin_set_opening(bigint,bigint,numeric) to authenticated;\ngrant execute on function public.teste_demo_toggle_card(boolean) to authenticated;
 revoke all on function public.teste_create_user_data() from public,anon,authenticated;
 revoke all on function public.teste_is_admin() from public,anon;
 commit;
