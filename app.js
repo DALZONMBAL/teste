@@ -15,12 +15,28 @@ function showScreen(id){
     screen.style.display=active?'block':'none';
     screen.setAttribute('aria-hidden',String(!active));
   });
+  const navSection=({
+    send:'home',
+    receive:'home',
+    withdraw:'home',
+    convert:'accounts',
+    personal:'profile',
+    preferences:'profile',
+    security:'profile',
+    help:'profile',
+    about:'profile'
+  })[id]||id;
   navButtons.forEach(button=>{
-    const active=button.dataset.screen===id;
+    const active=button.dataset.screen===navSection;
     button.classList.toggle('active',active);
     if(active) button.setAttribute('aria-current','page');
     else button.removeAttribute('aria-current');
   });
+  const heading=target.querySelector('h1');
+  if(heading){
+    heading.setAttribute('tabindex','-1');
+    heading.focus({preventScroll:true});
+  }
   window.scrollTo({top:0,left:0,behavior:'auto'});
   return true;
 }
