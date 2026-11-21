@@ -167,7 +167,7 @@ end $$;
 
 create or replace function public.teste_demo_toggle_card(p_locked boolean)
 returns text language plpgsql security definer set search_path=public,auth
-as $
+as $$
 declare v_status text;
 begin
  if auth.uid() is null then raise exception 'Connectez-vous.'; end if;
