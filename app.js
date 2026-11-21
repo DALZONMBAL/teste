@@ -63,7 +63,7 @@ document.querySelectorAll('[data-toast]').forEach(button=>{
   button.addEventListener('click',()=>toast(button.dataset.toast));
 });
 
-const TESTE_USD_CDF_RATE=2850;
+const TESTE_USD_CDF_RATE=2300;
 const DEMO_BALANCES={USD:1240.50,CDF:3534000};
 let hidden=false;
 let lastBalanceText='$ 1,240.50';
@@ -680,4 +680,154 @@ $('copyReceiveId')?.addEventListener('click',async()=>{
   }catch(error){
     toast(demoAccountId);
   }
+});
+
+
+// TESTE v2 — portefeuille pédagogique Supabase (aucune opération financière réelle).
+let serverTransfers=[];
+let demoCardLocked=false;
+let walletRefreshChannel=null;
+function formatMinor(value,currency){
+  const n=Number(value||0);
+  return currency==='USD'
+    ?'$ '+(n/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
+    :Math.round(n).toLocaleString('fr-FR')+' CDF';
+}
+function renderServerHistory(){
+  const query=(activitySearch?.value||'').trim().toLowerCase();
+  const type=activityFilter?.value||'all';
+  const filtered=serverTransfers.filter(item=>{
+    const incoming=item.direction==='in';
+    return (type==='all'||(type==='in'&&incoming)||(type==='out'&&!incoming))
+      && [item.other,item.currency,item.amount_minor,incoming?'réception':'envoi'].join(' ').toLowerCase().includes(query);
+  });
+  const make=(items,limit)=>{
+    const root=document.createElement('div');
+    (typeof limit==='number'?items.slice(0,limit):items).forEach(item=>{
+      const row=document.createElement('div');row.className='history-item '+(item.direction==='in'?'incoming':'outgoing');
+      const ico=document.createElement('div');ico.className='history-icon';ico.textContent=item.direction==='in'?'↙':'↗';
+      const main=document.createElement('div');main.className='history-main';
+      const title=document.createElement('strong');title.textContent=item.direction==='in'?'Montant reçu (démo)':'Envoi (démo)';
+      const sub=document.createElement('span');sub.textContent=new Date(item.created_at).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+      main.append(title,sub);
+      const amount=document.createElement('div');amount.className='history-amount';
+      amount.textContent=(item.direction==='in'?'+ ':'− ')+formatMinor(item.amount_minor,item.currency);
+      const status=document.createElement('small');status.textContent='Enregistré';amount.append(status);
+      row.append(ico,main,amount);root.append(row);
+    });
+    if(!root.childElementCount){const empty=document.createElement('div');empty.className='history-empty';empty.textContent='Aucune opération enregistrée.';root.append(empty);}
+    return root;
+  };
+  $('activityHistory')?.replaceChildren(make(filtered));
+  $('homeTransactions')?.replaceChildren(make(serverTransfers,4));
+}
+function renderNotifications(rows){
+  const root=$('notificationList');if(!root)return;
+  root.replaceChildren();
+  if(!rows?.length){const e=document.createElement('div');e.className='history-empty';e.textContent='Aucune notification pour le moment.';root.append(e);return;}
+  rows.forEach(n=>{
+    const row=document.createElement('div');row.className='history-item';
+    const ico=document.createElement('div');ico.className='history-icon';ico.textContent=n.is_read?'✓':'•';
+    const main=document.createElement('div');main.className='history-main';
+    const title=document.createElement('strong');title.textContent=n.title;
+    const body=document.createElement('span');body.textContent=n.body;
+    const date=document.createElement('span');date.textContent=new Date(n.created_at).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
+    main.append(title,body,date);row.append(ico,main);
+    if(!n.is_read){
+      const mark=document.createElement('button');mark.className='text-btn';mark.type='button';mark.textContent='Lu';
+      mark.addEventListener('click',async()=>{
+        const {error}=await supabaseClient.from('teste_notifications').update({is_read:true}).eq('id',n.id);
+        if(error)toast('Impossible de mettre à jour la notification.');
+        else await refreshDemoData();
+      });
+      row.append(mark);
+    }
+    root.append(row);
+  });
+}
+async function refreshDemoData(){
+  if(!supabaseClient||!currentUserId)return;
+  try{
+    const [profileRes,walletRes,transferRes,notificationRes,cardRes]=await Promise.all([
+      supabaseClient.from('teste_profiles').select('account_id,full_name').eq('user_id',currentUserId).maybeSingle(),
+      supabaseClient.from('teste_wallets').select('currency,balance_minor').eq('user_id',currentUserId),
+      supabaseClient.from('teste_transfers').select('id,sender_id,recipient_id,sender_currency,recipient_currency,sender_amount_minor,recipient_amount_minor,created_at').or('sender_id.eq.'+currentUserId+',recipient_id.eq.'+currentUserId).order('created_at',{ascending:false}).limit(50),
+      supabaseClient.from('teste_notifications').select('id,title,body,is_read,created_at').eq('user_id',currentUserId).order('created_at',{ascending:false}).limit(30),
+      supabaseClient.from('teste_cards').select('last4,status').eq('user_id',currentUserId).maybeSingle()
+    ]);
+    for(const r of [profileRes,walletRes,transferRes,notificationRes,cardRes])if(r.error)throw r.error;
+    if(profileRes.data?.account_id){
+      demoAccountId=profileRes.data.account_id;
+      setText('profileAccountLine','Identifiant TESTE · '+demoAccountId);
+      if($('personalAccountNumber'))$('personalAccountNumber').value=demoAccountId;
+      const receiveId=$('receive')?.querySelector('.receive-code strong');if(receiveId)receiveId.textContent=demoAccountId;
+      const qr=$('receiveQr');if(qr&&window.QRCode){qr.replaceChildren();new QRCode(qr,{text:'TESTE|'+demoAccountId,width:190,height:190,colorDark:'#10251e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}
+    }
+    const usd=walletRes.data?.find(w=>w.currency==='USD')?.balance_minor??0;
+    const cdf=walletRes.data?.find(w=>w.currency==='CDF')?.balance_minor??0;
+    const total=formatMinor(usd,'USD');
+    lastBalanceText=total;
+    if($('balance'))$('balance').textContent=hidden?'••••••':total;
+    const vals=document.querySelectorAll('.currency-value');
+    if(vals[0])vals[0].textContent=formatMinor(usd,'USD');
+    if(vals[1])vals[1].textContent=formatMinor(cdf,'CDF');
+    const accountAmounts=document.querySelectorAll('#accounts .account-card strong');
+    if(accountAmounts[0])accountAmounts[0].textContent=formatMinor(usd,'USD');
+    if(accountAmounts[1])accountAmounts[1].textContent=formatMinor(cdf,'CDF');
+    document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Solde de démonstration');
+    serverTransfers=(transferRes.data||[]).map(t=>{
+      const incoming=t.recipient_id===currentUserId;
+      return {id:t.id,direction:incoming?'in':'out',other:'Compte TESTE',currency:incoming?t.recipient_currency:t.sender_currency,amount_minor:incoming?t.recipient_amount_minor:t.sender_amount_minor,created_at:t.created_at};
+    });
+    renderServerHistory();
+    renderNotifications(notificationRes.data||[]);
+    if(cardRes.data){
+      demoCardLocked=cardRes.data.status==='locked';
+      setText('demoCardStatus',demoCardLocked?'VERROUILLÉE · DÉMO':'ACTIVE · DÉMO');
+      setText('demoCardStatusText',demoCardLocked?'Verrouillée':'Active');
+      setText('demoCardNumber','••••  ••••  ••••  '+cardRes.data.last4);
+      setText('toggleDemoCard',demoCardLocked?'Déverrouiller la carte':'Verrouiller la carte');
+    }
+  }catch(error){
+    console.error('TESTE data load:',error);
+    toast('Données TESTE indisponibles : vérifiez la migration SQL.');
+  }
+}
+activitySearch?.addEventListener('input',()=>{if(currentUserId)renderServerHistory();});
+activityFilter?.addEventListener('change',()=>{if(currentUserId)renderServerHistory();});
+
+const originalSendButton=$('sendTransferBtn');
+if(originalSendButton){
+  const activeSendButton=originalSendButton.cloneNode(true);
+  originalSendButton.replaceWith(activeSendButton);
+  activeSendButton.addEventListener('click',async()=>{
+    if(!currentUserId||!supabaseClient){toast('Connectez-vous pour envoyer un montant de démonstration.');return;}
+    const recipient=$('recipientAccount')?.value.trim().toUpperCase()||'';
+    const amount=Number($('sendAmount')?.value||0);
+    const from=$('sendFrom')?.value||'USD';
+    const to=$('sendTo')?.value||'CDF';
+    if(!/^TST[A-Z0-9]{10}$/.test(recipient)){toast('Identifiant TESTE invalide.');return;}
+    if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant supérieur à zéro.');return;}
+    activeSendButton.disabled=true;activeSendButton.textContent='Enregistrement…';
+    try{
+      const {data,error}=await supabaseClient.rpc('teste_demo_send',{
+        p_recipient_account:recipient,p_amount:amount,p_sender_currency:from,p_recipient_currency:to
+      });
+      if(error)throw error;
+      $('sendPreview').hidden=true;
+      toast('Transfert de démonstration enregistré.');
+      await refreshDemoData();
+    }catch(error){toast(error.message||'Envoi impossible. Vérifiez le solde et l’identifiant.');}
+    finally{activeSendButton.disabled=false;activeSendButton.textContent='Envoyer le montant (démo)';}
+  });
+}
+$('toggleDemoCard')?.addEventListener('click',async()=>{
+  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour gérer la carte de démonstration.');return;}
+  const button=$('toggleDemoCard');button.disabled=true;
+  try{
+    const {error}=await supabaseClient.rpc('teste_demo_toggle_card',{p_locked:!demoCardLocked});
+    if(error)throw error;
+    await refreshDemoData();toast(demoCardLocked?'Carte verrouillée.':'Carte déverrouillée.');
+  }catch(error){toast(error.message||'Action indisponible. Vérifiez la migration SQL.');}
+  finally{button.disabled=false;}
 });
