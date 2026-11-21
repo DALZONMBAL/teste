@@ -177,7 +177,7 @@ begin
  insert into public.teste_notifications(user_id,title,body)
  values(auth.uid(),'Carte mise à jour',case when p_locked then 'Votre carte de démonstration est verrouillée.' else 'Votre carte de démonstration est activée.' end);
  return v_status;
-end $;
+end $$;
 
 alter table public.teste_profiles enable row level security;
 alter table public.teste_wallets enable row level security;
