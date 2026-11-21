@@ -126,8 +126,8 @@ body.dark .transactions{background:#14231b;border-color:#26372c}
 <div class="form-grid"><label class="field"><span>Montant présenté</span><input id="sendAmount" type="number" value="100" min="0" step="0.01" inputmode="decimal"></label><label class="field"><span>Devise de départ</span><select id="sendFrom"><option value="USD">USD — Dollar</option><option value="CDF">CDF — Franc congolais</option></select></label></div>
 <div class="form-grid"><label class="field"><span>Montant affiché à l’arrivée</span><input id="sendReceive" value="285 000 CDF" readonly></label><label class="field"><span>Devise d’arrivée</span><select id="sendTo"><option value="CDF">CDF — Franc congolais</option><option value="USD">USD — Dollar</option></select></label></div>
 <div class="rate"><span>Taux de démonstration</span><strong>1 USD ≈ <span data-rate-display>2 300</span> CDF</strong></div>
-<button class="primary-btn" id="sendTransferBtn" type="button">Afficher l’aperçu</button>
-<p class="form-note">Aucune opération n’est transmise ni enregistrée.</p>
+<button class="primary-btn" id="sendTransferBtn" type="button">Envoyer le montant (démo)</button>
+<p class="form-note">Le transfert est enregistré dans le portefeuille pédagogique TESTE. Aucun argent réel n’est déplacé.</p>
 </div>
 <div class="panel send-preview" id="sendPreview" hidden aria-live="polite"><div class="preview-kicker">APERÇU PRÊT</div><h3>Récapitulatif</h3><div class="preview-line"><span>Identifiant</span><strong id="previewRecipient">—</strong></div><div class="preview-line"><span>Montant présenté</span><strong id="previewAmount">—</strong></div><div class="preview-line"><span>Montant affiché à l’arrivée</span><strong id="previewReceive">—</strong></div><p class="form-note">Cet écran présente le parcours visuel uniquement. Rien n’a été envoyé.</p></div>
 </section>
