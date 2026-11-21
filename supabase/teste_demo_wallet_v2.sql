@@ -118,7 +118,7 @@ declare
   v_sender_name text;
 begin
   if v_sender is null then raise exception 'Connectez-vous pour continuer.'; end if;
-  if p_sender_currency not in ('USD','CDF') or p_recipient_currency not in ('USD','CDF') then raise exception 'Devise invalide.'; end if;
+  if p_sender_currency is null or p_recipient_currency is null or p_sender_currency not in ('USD','CDF') or p_recipient_currency not in ('USD','CDF') then raise exception 'Devise invalide.'; end if;
   if p_amount is null or p_amount <= 0 or p_amount > 100000000 then raise exception 'Montant invalide.'; end if;
   select user_id into v_recipient from public.teste_profiles where account_id=upper(trim(p_recipient_account));
   if v_recipient is null then raise exception 'Identifiant TESTE introuvable.'; end if;
