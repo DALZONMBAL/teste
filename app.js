@@ -64,9 +64,9 @@ document.querySelectorAll('[data-toast]').forEach(button=>{
 });
 
 const TESTE_USD_CDF_RATE=2300;
-const DEMO_BALANCES={USD:1240.50,CDF:3534000};
+const DEMO_BALANCES={USD:0,CDF:0};
 let hidden=false;
-let lastBalanceText='$ 1,240.50';
+let lastBalanceText='$ 0.00';
 let currentUserId=null;
 let currentProfile=null;
 let demoAccountId='TST0000000000';
@@ -143,12 +143,7 @@ $('toggleBalance')?.addEventListener('click',()=>{
 });
 renderDemoAccounts();
 
-const demoActivity=[
-  {id:'demo-1',direction:'in',other:'TST••••4821',currency:'USD',amount_minor:12500,created_at:new Date(Date.now()-86400000).toISOString()},
-  {id:'demo-2',direction:'out',other:'TST••••1936',currency:'CDF',amount_minor:45000,created_at:new Date(Date.now()-86400000*2).toISOString()},
-  {id:'demo-3',direction:'in',other:'TST••••7304',currency:'USD',amount_minor:8900,created_at:new Date(Date.now()-86400000*4).toISOString()},
-  {id:'demo-4',direction:'out',other:'TST••••6042',currency:'CDF',amount_minor:125000,created_at:new Date(Date.now()-86400000*6).toISOString()}
-];
+const demoActivity=[];
 const activitySearch=$('activitySearch');
 const activityFilter=$('activityFilter');
 
