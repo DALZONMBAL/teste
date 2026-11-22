@@ -1,7 +1,6 @@
 'use strict';
 
-/* TESTE — interface de présentation. Les parcours financiers restent locaux :
-   aucun transfert, paiement, solde ou historique n'est envoyé à un serveur. */
+/* TESTE — application connectée : profils, portefeuilles et historique sont stockés dans Supabase. */
 
 const $ = id => document.getElementById(id);
 const navButtons = [...document.querySelectorAll('[data-screen]')];
@@ -64,7 +63,7 @@ document.querySelectorAll('[data-toast]').forEach(button=>{
 });
 
 const TESTE_USD_CDF_RATE=2300;
-const DEMO_BALANCES={USD:0,CDF:0};
+const INITIAL_BALANCES={USD:0,CDF:0};
 let hidden=false;
 let lastBalanceText='$ 0.00';
 let currentUserId=null;
@@ -124,15 +123,15 @@ updateHomeConversion();
 updateSendQuote();
 
 function renderDemoAccounts(){
-  lastBalanceText=formatMajor(DEMO_BALANCES.USD,'USD');
+  lastBalanceText=formatMajor(INITIAL_BALANCES.USD,'USD');
   const balance=$('balance');
   if(balance) balance.textContent=hidden?'••••••':lastBalanceText;
   const currencyValues=document.querySelectorAll('.currency-value');
-  if(currencyValues[0]) currencyValues[0].textContent=formatMajor(DEMO_BALANCES.USD,'USD');
-  if(currencyValues[1]) currencyValues[1].textContent=formatMajor(DEMO_BALANCES.CDF,'CDF');
+  if(currencyValues[0]) currencyValues[0].textContent=formatMajor(INITIAL_BALANCES.USD,'USD');
+  if(currencyValues[1]) currencyValues[1].textContent=formatMajor(INITIAL_BALANCES.CDF,'CDF');
   const cards=document.querySelectorAll('#accounts .account-card strong');
-  if(cards[0]) cards[0].textContent=formatMajor(DEMO_BALANCES.USD,'USD');
-  if(cards[1]) cards[1].textContent=formatMajor(DEMO_BALANCES.CDF,'CDF');
+  if(cards[0]) cards[0].textContent=formatMajor(INITIAL_BALANCES.USD,'USD');
+  if(cards[1]) cards[1].textContent=formatMajor(INITIAL_BALANCES.CDF,'CDF');
   document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Montant de présentation');
 }
 $('toggleBalance')?.addEventListener('click',()=>{
@@ -233,16 +232,20 @@ function setDemoId(user){
     new QRCode(qr,{text:'TESTE|'+demoAccountId,width:190,height:190,colorDark:'#10251e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
   }
 }
-function loadPreferences(){
+async function loadPreferences(){
   let prefs={};
-  try{prefs=JSON.parse(localStorage.getItem('teste-preferences')||'{}');}catch(error){}
+  if(supabaseClient&&currentUserId){
+    const {data,error}=await supabaseClient.from('teste_profiles').select('preferences').eq('user_id',currentUserId).maybeSingle();
+    if(error) throw error;
+    prefs=data?.preferences||{};
+  }
   const theme=prefs.theme||'light';
   if($('prefTheme')) $('prefTheme').value=theme;
   if($('prefCurrency')) $('prefCurrency').value=prefs.currency||'USD';
-  if($('prefLanguage')) $('prefLanguage').value='fr';
+  if($('prefLanguage')) $('prefLanguage').value=prefs.language||'fr';
   document.body.classList.toggle('dark',theme==='dark');
 }
-loadPreferences();
+
 
 $('themeToggle')?.addEventListener('click',()=>{
   const dark=document.body.classList.toggle('dark');
@@ -359,7 +362,7 @@ async function loadUserData(user){
   setDemoId(user);
   renderDemoAccounts();
   renderTransferHistory();
-  loadPreferences();
+  await loadPreferences();
   await refreshDemoData();
   startWalletRealtime();
   try{await displayProfilePhoto(currentProfile.avatar_path);}catch(error){console.warn('Photo de profil indisponible.',error);}
@@ -462,54 +465,28 @@ supabaseClient?.auth.onAuthStateChange((event,session)=>{
 $('profilePhotoInput')?.addEventListener('change',async event=>{
   const file=event.target.files?.[0];
   if(!file) return;
-  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour modifier votre photo.');return;}
-  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>3*1024*1024){
-    toast('Choisissez une image JPG, PNG ou WebP de 3 Mo maximum.');
-    event.target.value='';
-    return;
-  }
-  const bytes=new Uint8Array(await file.slice(0,12).arrayBuffer());
-  const isJpeg=bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
-  const isPng=bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a;
-  const isWebp=bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP';
-  if(!(isJpeg||isPng||isWebp)){
-    toast('Le fichier ne correspond pas à une image autorisée.');
-    event.target.value='';
-    return;
-  }
-  const actualMime=isPng?'image/png':isWebp?'image/webp':'image/jpeg';
-  if(file.type!==actualMime){
-    toast('Le type déclaré ne correspond pas au fichier.');
-    event.target.value='';
-    return;
+  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour modifier votre photo.');event.target.value='';return;}
+  if(!file.type.startsWith('image/')||file.size<1||file.size>10*1024*1024){
+    toast('Choisissez une photo de 10 Mo maximum.');event.target.value='';return;
   }
   let bitmap=null;
-  try{
-    bitmap=await createImageBitmap(file);
-    if(bitmap.width>4096||bitmap.height>4096) throw new Error('Dimensions trop grandes.');
-  }catch(error){
-    toast('Image invalide ou dimensions trop grandes.');
-    event.target.value='';
-    return;
-  }finally{
-    if(bitmap) bitmap.close();
-  }
-  const extension=isPng?'png':isWebp?'webp':'jpg';
+  try{bitmap=await createImageBitmap(file);if(bitmap.width>6000||bitmap.height>6000)throw new Error('Image trop grande.');}
+  catch(error){toast('Cette image ne peut pas être ouverte sur cet appareil.');event.target.value='';return;}
+  finally{if(bitmap)bitmap.close();}
+  const extension=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const allowedExtensions=['jpg','jpeg','png','webp','gif','avif','bmp','tif','tiff','heic','heif'];
+  if(!allowedExtensions.includes(extension)){toast('Format photo non pris en charge.');event.target.value='';return;}
   const path=currentUserId+'/avatar.'+extension;
-  const button=$('profilePhotoInput');
   try{
-    const {error}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:actualMime});
-    if(error) throw error;
+    const {error}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:file.type});
+    if(error)throw error;
     const {error:updateError}=await supabaseClient.auth.updateUser({data:{avatar_path:path}});
-    if(updateError) throw updateError;
-    currentProfile.avatar_path=path;
+    if(updateError)throw updateError;
+    currentProfile={...(currentProfile||{}),avatar_path:path};
     await displayProfilePhoto(path);
-    toast('Photo de profil mise à jour.');
-  }catch(error){
-    toast('Photo non enregistrée : '+(error.message||'vérifiez le stockage du projet.'));
-  }finally{
-    if(button) button.value='';
-  }
+    toast('Photo de profil enregistrée.');
+  }catch(error){toast('Photo non enregistrée : '+(error.message||'réessayez.'));}
+  finally{event.target.value='';}
 });
 
 $('savePersonal')?.addEventListener('click',async()=>{
@@ -543,20 +520,19 @@ $('savePersonal')?.addEventListener('click',async()=>{
   }
 });
 
-$('savePreferences')?.addEventListener('click',()=>{
-  const preferences={
-    theme:$('prefTheme').value,
-    currency:$('prefCurrency').value,
-    language:$('prefLanguage').value||'fr'
-  };
+$('savePreferences')?.addEventListener('click',async()=>{
+  const preferences={theme:$('prefTheme').value,currency:$('prefCurrency').value,language:$('prefLanguage').value||'fr'};
+  const button=$('savePreferences');button.disabled=true;
   try{
-    localStorage.setItem('teste-preferences',JSON.stringify(preferences));
+    if(!supabaseClient||!currentUserId)throw new Error('Connectez-vous pour enregistrer vos préférences.');
+    const {error}=await supabaseClient.rpc('teste_update_preferences',{p_preferences:preferences});
+    if(error)throw error;
+    currentProfile={...(currentProfile||{}),preferences};
     document.body.classList.toggle('dark',preferences.theme==='dark');
-    $('preferencesMessage').textContent='Préférences enregistrées sur cet appareil.';
-    toast('Préférences mises à jour.');
-  }catch(error){
-    $('preferencesMessage').textContent='Le navigateur ne permet pas d’enregistrer ces préférences.';
-  }
+    $('preferencesMessage').textContent='Préférences enregistrées dans votre compte.';
+    toast('Préférences enregistrées.');
+  }catch(error){$('preferencesMessage').textContent='Enregistrement impossible : '+(error.message||'réessayez.');}
+  finally{button.disabled=false;}
 });
 
 $('changePassword')?.addEventListener('click',async()=>{
@@ -704,7 +680,7 @@ function renderServerHistory(){
       const row=document.createElement('div');row.className='history-item '+(item.direction==='in'?'incoming':'outgoing');
       const ico=document.createElement('div');ico.className='history-icon';ico.textContent=item.direction==='in'?'↙':'↗';
       const main=document.createElement('div');main.className='history-main';
-      const title=document.createElement('strong');title.textContent=item.direction==='in'?'Montant reçu (démo)':'Envoi (démo)';
+      const title=document.createElement('strong');title.textContent=item.direction==='in'?'Montant reçu':'Envoi';
       const sub=document.createElement('span');sub.textContent=new Date(item.created_at).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
       main.append(title,sub);
       const amount=document.createElement('div');amount.className='history-amount';
@@ -771,20 +747,21 @@ async function refreshDemoData(){
     const accountAmounts=document.querySelectorAll('#accounts .account-card strong');
     if(accountAmounts[0])accountAmounts[0].textContent=formatMinor(usd,'USD');
     if(accountAmounts[1])accountAmounts[1].textContent=formatMinor(cdf,'CDF');
-    document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Solde de démonstration');
+    document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Solde du compte');
     serverTransfers=(transferRes.data||[]).map(t=>{
       const incoming=t.recipient_id===currentUserId;
       return {id:t.id,direction:incoming?'in':'out',other:'Compte TESTE',currency:incoming?t.recipient_currency:t.sender_currency,amount_minor:incoming?t.recipient_amount_minor:t.sender_amount_minor,created_at:t.created_at};
     });
     renderServerHistory();
     renderNotifications(notificationRes.data||[]);
-    if(cardRes.data){
-      demoCardLocked=cardRes.data.status==='locked';
-      setText('demoCardStatus',demoCardLocked?'VERROUILLÉE · DÉMO':'ACTIVE · DÉMO');
-      setText('demoCardStatusText',demoCardLocked?'Verrouillée':'Active');
-      setText('demoCardNumber','••••  ••••  ••••  '+cardRes.data.last4);
-      setText('toggleDemoCard',demoCardLocked?'Déverrouiller la carte':'Verrouiller la carte');
-    }
+    demoCardLocked=cardRes.data?.status==='locked';
+    const cardLast4=cardRes.data?.last4||currentUserId.replace(/-/g,'').slice(-4).toUpperCase();
+    setText('demoCardStatus',demoCardLocked?'VERROUILLÉE':'ACTIVE');
+    setText('demoCardStatusText',demoCardLocked?'Verrouillée':'Active');
+    setText('demoCardNumber','••••  ••••  ••••  '+cardLast4);
+    setText('homeCardNumber','••••  ••••  ••••  '+cardLast4);
+    setText('homeCardStatus',demoCardLocked?'VERROUILLÉE':'ACTIVE');
+    setText('toggleDemoCard',demoCardLocked?'Déverrouiller la carte':'Verrouiller la carte');
   }catch(error){
     console.error('TESTE data load:',error);
     toast('Données TESTE indisponibles : vérifiez la migration SQL.');
@@ -798,7 +775,7 @@ if(originalSendButton){
   const activeSendButton=originalSendButton.cloneNode(true);
   originalSendButton.replaceWith(activeSendButton);
   activeSendButton.addEventListener('click',async()=>{
-    if(!currentUserId||!supabaseClient){toast('Connectez-vous pour envoyer un montant de démonstration.');return;}
+    if(!currentUserId||!supabaseClient){toast('Connectez-vous pour envoyer un montant.');return;}
     const recipient=$('recipientAccount')?.value.trim().toUpperCase()||'';
     const amount=Number($('sendAmount')?.value||0);
     const from=$('sendFrom')?.value||'USD';
@@ -819,7 +796,7 @@ if(originalSendButton){
   });
 }
 $('toggleDemoCard')?.addEventListener('click',async()=>{
-  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour gérer la carte de démonstration.');return;}
+  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour gérer la carte TESTE.');return;}
   const button=$('toggleDemoCard');button.disabled=true;
   try{
     const {error}=await supabaseClient.rpc('teste_demo_toggle_card',{p_locked:!demoCardLocked});
