@@ -235,7 +235,8 @@ function setDemoId(user){
 async function loadPreferences(){
   let prefs={};
   if(supabaseClient&&currentUserId){
-    const {data,error}=await supabaseClient.from('teste_profiles').select('preferences').eq('user_id',currentUserId).maybeSingle();
+    // Les préférences sont stockées dans public.profiles (clé primaire id).
+    const {data,error}=await supabaseClient.from('profiles').select('preferences').eq('id',currentUserId).maybeSingle();
     if(error) throw error;
     prefs=data?.preferences||{};
   }
