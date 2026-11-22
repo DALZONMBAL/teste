@@ -61,7 +61,7 @@ with check(
   and (storage.foldername(name))[1]=(select auth.uid())::text
   and coalesce(metadata->>'mimetype','') like 'image/%'
   and coalesce((metadata->>'size')::bigint,0) between 1 and 10485760
-  and lower(name) ~ '\\.[a-z0-9]{2,8}$'
+  and lower(name) ~ '\.[a-z0-9]{2,8}$'
 );
 
 create policy profile_photos_update_own on storage.objects
@@ -72,7 +72,7 @@ with check(
   and (storage.foldername(name))[1]=(select auth.uid())::text
   and coalesce(metadata->>'mimetype','') like 'image/%'
   and coalesce((metadata->>'size')::bigint,0) between 1 and 10485760
-  and lower(name) ~ '\\.[a-z0-9]{2,8}$'
+  and lower(name) ~ '\.[a-z0-9]{2,8}$'
 );
 
 create policy profile_photos_delete_own on storage.objects
