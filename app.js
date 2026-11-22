@@ -132,7 +132,7 @@ function renderDemoAccounts(){
   const cards=document.querySelectorAll('#accounts .account-card strong');
   if(cards[0]) cards[0].textContent=formatMajor(INITIAL_BALANCES.USD,'USD');
   if(cards[1]) cards[1].textContent=formatMajor(INITIAL_BALANCES.CDF,'CDF');
-  document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Montant de présentation');
+  document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Solde du compte');
 }
 $('toggleBalance')?.addEventListener('click',()=>{
   hidden=!hidden;
@@ -469,13 +469,8 @@ $('profilePhotoInput')?.addEventListener('change',async event=>{
   if(!file.type.startsWith('image/')||file.size<1||file.size>10*1024*1024){
     toast('Choisissez une photo de 10 Mo maximum.');event.target.value='';return;
   }
-  let bitmap=null;
-  try{bitmap=await createImageBitmap(file);if(bitmap.width>6000||bitmap.height>6000)throw new Error('Image trop grande.');}
-  catch(error){toast('Cette image ne peut pas être ouverte sur cet appareil.');event.target.value='';return;}
-  finally{if(bitmap)bitmap.close();}
-  const extension=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const allowedExtensions=['jpg','jpeg','png','webp','gif','avif','bmp','tif','tiff','heic','heif'];
-  if(!allowedExtensions.includes(extension)){toast('Format photo non pris en charge.');event.target.value='';return;}
+  const rawExtension=(file.name.split('.').pop()||file.type.split('/').pop()||'img').toLowerCase();
+  const extension=rawExtension.replace(/[^a-z0-9]/g,'').slice(0,8)||'img';
   const path=currentUserId+'/avatar.'+extension;
   try{
     const {error}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:file.type});
@@ -789,10 +784,10 @@ if(originalSendButton){
       });
       if(error)throw error;
       $('sendPreview').hidden=true;
-      toast('Transfert de démonstration enregistré.');
+      toast('Transfert enregistré.');
       await refreshDemoData();
     }catch(error){toast(error.message||'Envoi impossible. Vérifiez le solde et l’identifiant.');}
-    finally{activeSendButton.disabled=false;activeSendButton.textContent='Envoyer le montant (démo)';}
+    finally{activeSendButton.disabled=false;activeSendButton.textContent='Envoyer';}
   });
 }
 $('toggleDemoCard')?.addEventListener('click',async()=>{
