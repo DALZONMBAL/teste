@@ -754,11 +754,13 @@ async function refreshDemoData(){
     renderServerHistory();
     renderNotifications(notificationRes.data||[]);
     demoCardLocked=cardRes.data?.status==='locked';
-    const cardLast4=cardRes.data?.last4||currentUserId.replace(/-/g,'').slice(-4).toUpperCase();
+    // Afficher l'identifiant de carte TESTE complet, sans inventer un numéro bancaire.
+    const cardReference=(demoAccountId||('TST'+currentUserId.replace(/-/g,'').slice(0,10))).toUpperCase();
+    const formattedCardReference=cardReference.match(/.{1,4}/g)?.join('  ')||cardReference;
     setText('demoCardStatus',demoCardLocked?'VERROUILLÉE':'ACTIVE');
     setText('demoCardStatusText',demoCardLocked?'Verrouillée':'Active');
-    setText('demoCardNumber','••••  ••••  ••••  '+cardLast4);
-    setText('homeCardNumber','••••  ••••  ••••  '+cardLast4);
+    setText('demoCardNumber',formattedCardReference);
+    setText('homeCardNumber',formattedCardReference);
     setText('homeCardStatus',demoCardLocked?'VERROUILLÉE':'ACTIVE');
     setText('toggleDemoCard',demoCardLocked?'Déverrouiller la carte':'Verrouiller la carte');
   }catch(error){
