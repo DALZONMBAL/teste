@@ -161,7 +161,7 @@ function renderTransferHistory(){
     if(!shown.length){
       const empty=document.createElement('div');
       empty.className='history-empty';
-      empty.textContent='Aucun exemple ne correspond à votre recherche.';
+      empty.textContent='Aucune opération ne correspond à votre recherche.';
       root.append(empty);
       return root;
     }
@@ -191,13 +191,13 @@ function renderTransferHistory(){
       const title=document.createElement('strong');
       title.textContent=(incoming?'Entrée depuis ':'Sortie vers ')+item.other;
       const sub=document.createElement('span');
-      sub.textContent=date.toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'})+' · Exemple';
+      sub.textContent=date.toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'})+' · TESTE';
       main.append(title,sub);
       const amount=document.createElement('div');
       amount.className='history-amount';
       amount.textContent=(incoming?'+ ':'− ')+money(item.amount_minor,item.currency);
       const state=document.createElement('small');
-      state.textContent='Aperçu';
+      state.textContent='Enregistré';
       amount.append(state);
       row.append(icon,main,amount);
       parent.append(row);
@@ -247,14 +247,17 @@ async function loadPreferences(){
 }
 
 
-$('themeToggle')?.addEventListener('click',()=>{
-  const dark=document.body.classList.toggle('dark');
+$('themeToggle')?.addEventListener('click',async()=>{
+  const dark=!document.body.classList.contains('dark');
+  if(!supabaseClient||!currentUserId){toast('Connectez-vous pour enregistrer le thème.');return;}
+  const preferences={theme:dark?'dark':'light',currency:$('prefCurrency')?.value||'USD',language:$('prefLanguage')?.value||'fr'};
   try{
-    const prefs=JSON.parse(localStorage.getItem('teste-preferences')||'{}');
-    prefs.theme=dark?'dark':'light';
-    localStorage.setItem('teste-preferences',JSON.stringify(prefs));
-  }catch(error){}
-  if($('prefTheme')) $('prefTheme').value=dark?'dark':'light';
+    const {error}=await supabaseClient.rpc('teste_update_preferences',{p_preferences:preferences});
+    if(error)throw error;
+    document.body.classList.toggle('dark',dark);
+    if($('prefTheme'))$('prefTheme').value=preferences.theme;
+    currentProfile={...(currentProfile||{}),preferences};
+  }catch(error){toast('Thème non enregistré : '+(error.message||'réessayez.'));}
 });
 
 const SUPABASE_URL='https://dswomwtdeuuhojchyykd.supabase.co';
