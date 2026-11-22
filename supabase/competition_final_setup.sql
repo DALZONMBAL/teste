@@ -19,7 +19,7 @@ declare
   v_language text;
 begin
   if v_user is null then raise exception 'Connexion requise.'; end if;
-  if jsonb_typeof(p_preferences) <> 'object' then raise exception 'Préférences invalides.'; end if;
+  if p_preferences is null or jsonb_typeof(p_preferences) <> 'object' then raise exception 'Préférences invalides.'; end if;
   v_theme := case when p_preferences->>'theme' in ('light','dark') then p_preferences->>'theme' else 'light' end;
   v_currency := case when p_preferences->>'currency' in ('USD','CDF') then p_preferences->>'currency' else 'USD' end;
   v_language := case when p_preferences->>'language' in ('fr','en','sw') then p_preferences->>'language' else 'fr' end;
