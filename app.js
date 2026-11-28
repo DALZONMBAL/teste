@@ -1,6 +1,6 @@
 'use strict';
 
-/* TESTE — application connectée : profils, portefeuilles et historique sont stockés dans Supabase. */
+/* TESTE — interface de présentation. Seule l’authentification utilise Supabase. */
 
 const $ = id => document.getElementById(id);
 const navButtons = [...document.querySelectorAll('[data-screen]')];
@@ -62,13 +62,13 @@ document.querySelectorAll('[data-toast]').forEach(button=>{
   button.addEventListener('click',()=>toast(button.dataset.toast));
 });
 
-const TESTE_USD_CDF_RATE=2300;
-const INITIAL_BALANCES={USD:0,CDF:0};
+const TESTE_USD_CDF_RATE=2850;
+const INITIAL_BALANCES={USD:1240.5,CDF:3534000};
 let hidden=false;
 let lastBalanceText='$ 0.00';
 let currentUserId=null;
 let currentProfile=null;
-let demoAccountId='TST0000000000';
+let profilePhotoObjectUrl=null;
 let supabaseClient=null;
 
 function money(value,currency){
@@ -161,7 +161,7 @@ function renderTransferHistory(){
     if(!shown.length){
       const empty=document.createElement('div');
       empty.className='history-empty';
-      empty.textContent='Aucune opération ne correspond à votre recherche.';
+      empty.textContent='Aucune activité pour le moment.';
       root.append(empty);
       return root;
     }
@@ -218,47 +218,42 @@ function setText(id,value){
   const el=$(id);
   if(el) el.textContent=value;
 }
-function setDemoId(user){
-  const raw=String(user?.id||'').replace(/[^a-z0-9]/gi,'').toUpperCase();
-  demoAccountId='TST'+(raw+'0000000000').slice(0,10);
-  setText('profileAccountLine','Identifiant TESTE · '+demoAccountId);
-  const accountField=$('personalAccountNumber');
-  if(accountField) accountField.value=demoAccountId;
-  const receiveId=$('receive')?.querySelector('.receive-code strong');
-  if(receiveId) receiveId.textContent=demoAccountId;
+function setShareCode(){
+  const shareUrl=window.location.origin+window.location.pathname;
+  const label=$('receive')?.querySelector('.receive-code strong');
+  if(label) label.textContent=window.location.host+window.location.pathname;
   const qr=$('receiveQr');
   if(qr&&window.QRCode){
     qr.replaceChildren();
-    new QRCode(qr,{text:'TESTE|'+demoAccountId,width:190,height:190,colorDark:'#10251e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+    new QRCode(qr,{text:shareUrl,width:190,height:190,colorDark:'#10251e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
   }
 }
-async function loadPreferences(){
-  let prefs={};
-  if(supabaseClient&&currentUserId){
-    // Les préférences sont stockées dans public.profiles (clé primaire id).
-    const {data,error}=await supabaseClient.from('profiles').select('preferences').eq('id',currentUserId).maybeSingle();
-    if(error) throw error;
-    prefs=data?.preferences||{};
-  }
-  const theme=prefs.theme||'light';
+
+const PREFERENCES_KEY='teste.preferences.v1';
+function readPreferences(){
+  try{return JSON.parse(localStorage.getItem(PREFERENCES_KEY)||'{}');}
+  catch(error){return {};}
+}
+function saveLocalPreferences(preferences){
+  try{localStorage.setItem(PREFERENCES_KEY,JSON.stringify(preferences));}
+  catch(error){toast('Préférences non conservées sur cet appareil.');}
+}
+function loadPreferences(){
+  const prefs=readPreferences();
+  const theme=prefs.theme==='dark'?'dark':'light';
   if($('prefTheme')) $('prefTheme').value=theme;
-  if($('prefCurrency')) $('prefCurrency').value=prefs.currency||'USD';
-  if($('prefLanguage')) $('prefLanguage').value=prefs.language||'fr';
+  if($('prefCurrency')) $('prefCurrency').value=prefs.currency==='CDF'?'CDF':'USD';
+  if($('prefLanguage')) $('prefLanguage').value='fr';
   document.body.classList.toggle('dark',theme==='dark');
 }
+loadPreferences();
 
-
-$('themeToggle')?.addEventListener('click',async()=>{
+$('themeToggle')?.addEventListener('click',()=>{
   const dark=!document.body.classList.contains('dark');
-  if(!supabaseClient||!currentUserId){toast('Connectez-vous pour enregistrer le thème.');return;}
-  const preferences={theme:dark?'dark':'light',currency:$('prefCurrency')?.value||'USD',language:$('prefLanguage')?.value||'fr'};
-  try{
-    const {error}=await supabaseClient.rpc('teste_update_preferences',{p_preferences:preferences});
-    if(error)throw error;
-    document.body.classList.toggle('dark',dark);
-    if($('prefTheme'))$('prefTheme').value=preferences.theme;
-    currentProfile={...(currentProfile||{}),preferences};
-  }catch(error){toast('Thème non enregistré : '+(error.message||'réessayez.'));}
+  const preferences={...readPreferences(),theme:dark?'dark':'light'};
+  saveLocalPreferences(preferences);
+  document.body.classList.toggle('dark',dark);
+  if($('prefTheme')) $('prefTheme').value=preferences.theme;
 });
 
 const SUPABASE_URL='https://dswomwtdeuuhojchyykd.supabase.co';
@@ -289,7 +284,7 @@ function openAuth(mode='login'){
   setAuthMode(mode);
 }
 $('getStarted')?.addEventListener('click',()=>openAuth('login'));
-$('openAuth')?.addEventListener('click',()=>openAuth('login'));
+$('openAuth')?.addEventListener('click',()=>{if(currentUserId)showScreen('profile');else openAuth('login');});
 $('closeAuth')?.addEventListener('click',()=>{
   authScreen.classList.remove('open');
   if(!currentUserId) welcomeScreen.style.display='flex';
@@ -307,11 +302,11 @@ try{
   authMessage.textContent='Impossible d’initialiser la connexion TESTE.';
 }
 
-async function displayProfilePhoto(path){
+function displayProfilePhoto(source){
   const img=$('profilePhoto');
   const initials=$('profileInitials');
   if(!img) return;
-  if(!path||!supabaseClient){
+  if(!source){
     img.removeAttribute('src');
     img.hidden=true;
     if(initials) initials.hidden=false;
@@ -319,19 +314,13 @@ async function displayProfilePhoto(path){
     document.querySelectorAll('.avatar').forEach(el=>el.textContent=label);
     return;
   }
-  const {data,error}=await supabaseClient.storage.from('profile-photos').createSignedUrl(path,3600);
-  if(error) throw error;
-  const safeUrl=new URL(data.signedUrl);
-  if(safeUrl.origin!==SUPABASE_URL||!safeUrl.pathname.includes('/storage/v1/object/sign/profile-photos/')){
-    throw new Error('Adresse de photo non autorisée.');
-  }
-  img.src=safeUrl.href;
+  img.src=source;
   img.hidden=false;
   if(initials) initials.hidden=true;
   document.querySelectorAll('.avatar').forEach(el=>{
     const avatarImage=document.createElement('img');
     avatarImage.alt='';
-    avatarImage.src=safeUrl.href;
+    avatarImage.src=source;
     avatarImage.style.width='100%';
     avatarImage.style.height='100%';
     avatarImage.style.objectFit='cover';
@@ -349,27 +338,25 @@ async function loadUserData(user){
   currentUserId=user.id;
   const metadata=user.user_metadata||{};
   const name=metadata.full_name||metadata.name||(user.email?user.email.split('@')[0]:'Utilisateur TESTE');
-  currentProfile={full_name:name,avatar_path:metadata.avatar_path||null};
+  currentProfile={full_name:name,avatar_url:profilePhotoObjectUrl};
   const initials=initialsFor(name);
   setText('profileDisplayName',name);
   setText('profileInitials',initials);
   setText('profileEmailLine',user.email||'');
   setText('securityEmail',user.email||'—');
-  setText('personalFullName',name);
   const personalName=$('personalFullName');
   if(personalName) personalName.value=name;
   const personalEmail=$('personalEmail');
   if(personalEmail) personalEmail.value=user.email||'';
+  setText('profileAccountLine','Espace personnel');
   document.querySelectorAll('.avatar').forEach(el=>el.textContent=initials);
   const welcomeTitle=document.querySelector('.welcome h1');
   if(welcomeTitle) welcomeTitle.textContent='Bonjour, '+name;
-  setDemoId(user);
   renderDemoAccounts();
   renderTransferHistory();
-  await loadPreferences();
-  await refreshDemoData();
-  startWalletRealtime();
-  try{await displayProfilePhoto(currentProfile.avatar_path);}catch(error){console.warn('Photo de profil indisponible.',error);}
+  loadPreferences();
+  displayProfilePhoto(currentProfile.avatar_url);
+  if($('openAuth')) $('openAuth').textContent='Mon profil';
   welcomeScreen.style.display='none';
   authScreen.classList.remove('open');
   showScreen('home');
@@ -435,7 +422,9 @@ supabaseClient?.auth.onAuthStateChange((event,session)=>{
   }else if(event==='SIGNED_OUT'){
     currentUserId=null;
     currentProfile=null;
-    demoAccountId='TST0000000000';
+    if($('openAuth')) $('openAuth').textContent='Connexion';
+    if(profilePhotoObjectUrl){URL.revokeObjectURL(profilePhotoObjectUrl);profilePhotoObjectUrl=null;}
+    displayProfilePhoto(null);
     welcomeScreen.style.display='flex';
     authScreen.classList.remove('open');
     showScreen('home');
@@ -466,26 +455,21 @@ supabaseClient?.auth.onAuthStateChange((event,session)=>{
   }
 })();
 
-$('profilePhotoInput')?.addEventListener('change',async event=>{
+$('profilePhotoInput')?.addEventListener('change',event=>{
   const file=event.target.files?.[0];
   if(!file) return;
-  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour modifier votre photo.');event.target.value='';return;}
-  if(!file.type.startsWith('image/')||file.size<1||file.size>10*1024*1024){
-    toast('Choisissez une photo de 10 Mo maximum.');event.target.value='';return;
+  if(!currentUserId){toast('Connectez-vous pour personnaliser votre profil.');event.target.value='';return;}
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>3*1024*1024){
+    toast('Choisissez une image JPG, PNG ou WebP de 3 Mo maximum.');
+    event.target.value='';
+    return;
   }
-  const rawExtension=(file.name.split('.').pop()||file.type.split('/').pop()||'img').toLowerCase();
-  const extension=rawExtension.replace(/[^a-z0-9]/g,'').slice(0,8)||'img';
-  const path=currentUserId+'/avatar.'+extension;
-  try{
-    const {error}=await supabaseClient.storage.from('profile-photos').upload(path,file,{upsert:true,contentType:file.type});
-    if(error)throw error;
-    const {error:updateError}=await supabaseClient.auth.updateUser({data:{avatar_path:path}});
-    if(updateError)throw updateError;
-    currentProfile={...(currentProfile||{}),avatar_path:path};
-    await displayProfilePhoto(path);
-    toast('Photo de profil enregistrée.');
-  }catch(error){toast('Photo non enregistrée : '+(error.message||'réessayez.'));}
-  finally{event.target.value='';}
+  if(profilePhotoObjectUrl) URL.revokeObjectURL(profilePhotoObjectUrl);
+  profilePhotoObjectUrl=URL.createObjectURL(file);
+  currentProfile={...(currentProfile||{}),avatar_url:profilePhotoObjectUrl};
+  displayProfilePhoto(profilePhotoObjectUrl);
+  toast('Photo affichée dans cet aperçu. Elle n’est pas envoyée.');
+  event.target.value='';
 });
 
 $('savePersonal')?.addEventListener('click',async()=>{
@@ -519,19 +503,17 @@ $('savePersonal')?.addEventListener('click',async()=>{
   }
 });
 
-$('savePreferences')?.addEventListener('click',async()=>{
-  const preferences={theme:$('prefTheme').value,currency:$('prefCurrency').value,language:$('prefLanguage').value||'fr'};
-  const button=$('savePreferences');button.disabled=true;
-  try{
-    if(!supabaseClient||!currentUserId)throw new Error('Connectez-vous pour enregistrer vos préférences.');
-    const {error}=await supabaseClient.rpc('teste_update_preferences',{p_preferences:preferences});
-    if(error)throw error;
-    currentProfile={...(currentProfile||{}),preferences};
-    document.body.classList.toggle('dark',preferences.theme==='dark');
-    $('preferencesMessage').textContent='Préférences enregistrées dans votre compte.';
-    toast('Préférences enregistrées.');
-  }catch(error){$('preferencesMessage').textContent='Enregistrement impossible : '+(error.message||'réessayez.');}
-  finally{button.disabled=false;}
+$('savePreferences')?.addEventListener('click',()=>{
+  const preferences={
+    theme:$('prefTheme').value==='dark'?'dark':'light',
+    currency:$('prefCurrency').value==='CDF'?'CDF':'USD',
+    language:'fr'
+  };
+  saveLocalPreferences(preferences);
+  currentProfile={...(currentProfile||{}),preferences};
+  document.body.classList.toggle('dark',preferences.theme==='dark');
+  $('preferencesMessage').textContent='Préférences conservées sur cet appareil.';
+  toast('Préférences enregistrées.');
 });
 
 $('changePassword')?.addEventListener('click',async()=>{
@@ -566,20 +548,15 @@ $('logoutAll')?.addEventListener('click',logoutCurrent);
 
 const sendButton=$('sendTransferBtn');
 sendButton?.addEventListener('click',()=>{
-  const recipient=$('recipientAccount')?.value.trim().toUpperCase()||'';
   const amount=Number($('sendAmount')?.value||0);
   const from=$('sendFrom')?.value||'USD';
   const to=$('sendTo')?.value||'CDF';
-  if(!/^TST[A-Z0-9]{10}$/.test(recipient)){
-    toast('Saisissez un identifiant TESTE valide.');
-    return;
-  }
   if(!Number.isFinite(amount)||amount<=0){
     toast('Saisissez un montant supérieur à zéro.');
     return;
   }
   const received=from===to?amount:(from==='USD'?amount*TESTE_USD_CDF_RATE:amount/TESTE_USD_CDF_RATE);
-  setText('previewRecipient',recipient);
+  setText('previewRecipient','Compte TESTE');
   setText('previewAmount',formatMajor(amount,from));
   setText('previewReceive',formatMajor(received,to));
   const preview=$('sendPreview');
@@ -587,241 +564,16 @@ sendButton?.addEventListener('click',()=>{
     preview.hidden=false;
     preview.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
   }
-  toast('Aperçu prêt.');
-});
-
-let qrScanner=null;
-let qrBusy=false;
-$('openQrScanner')?.addEventListener('click',async()=>{
-  const panel=$('qrScannerPanel');
-  panel.hidden=false;
-  if(qrScanner?.isScanning) return;
-  if(!window.Html5Qrcode){
-    panel.hidden=true;
-    toast('Lecture QR indisponible. Saisissez l’identifiant.');
-    return;
-  }
-  try{
-    if(!qrScanner) qrScanner=new Html5Qrcode('qrReader',{verbose:false});
-    await qrScanner.start(
-      {facingMode:'environment'},
-      {fps:8,qrbox:{width:220,height:220}},
-      async decodedText=>{
-        if(qrBusy) return;
-        const match=String(decodedText||'').trim().match(/^TESTE\|(TST[A-Z0-9]{10})$/i);
-        if(!match){
-          toast('Ce QR code ne correspond pas à un identifiant TESTE.');
-          return;
-        }
-        qrBusy=true;
-        $('recipientAccount').value=match[1].toUpperCase();
-        try{await qrScanner.stop();}catch(error){}
-        panel.hidden=true;
-        qrBusy=false;
-        toast('Identifiant reconnu.');
-      },
-      ()=>{}
-    );
-  }catch(error){
-    try{if(qrScanner?.isScanning) await qrScanner.stop();}catch(stopError){}
-    panel.hidden=true;
-    toast('Caméra inaccessible. Saisissez l’identifiant manuellement.');
-  }
-});
-document.addEventListener('visibilitychange',async()=>{
-  if(document.hidden&&qrScanner?.isScanning){
-    try{await qrScanner.stop();}catch(error){}
-    if($('qrScannerPanel')) $('qrScannerPanel').hidden=true;
-  }
-});
-$('closeQrScanner')?.addEventListener('click',async()=>{
-  if(qrScanner?.isScanning){
-    try{await qrScanner.stop();}catch(error){}
-  }
-  $('qrScannerPanel').hidden=true;
+  toast('Récapitulatif affiché.');
 });
 
 $('copyReceiveId')?.addEventListener('click',async()=>{
-  if(!currentUserId){
-    toast('Connectez-vous pour afficher votre identifiant.');
-    return;
-  }
+  const shareUrl=window.location.origin+window.location.pathname;
   try{
-    await navigator.clipboard.writeText(demoAccountId);
-    toast('Identifiant copié.');
+    await navigator.clipboard.writeText(shareUrl);
+    toast('Lien TESTE copié.');
   }catch(error){
-    toast(demoAccountId);
+    toast(window.location.host+window.location.pathname);
   }
 });
-
-
-// TESTE v2 — portefeuille pédagogique Supabase (aucune opération financière réelle).
-let serverTransfers=[];
-let demoCardLocked=false;
-let walletRefreshChannel=null;
-function formatMinor(value,currency){
-  const n=Number(value||0);
-  return currency==='USD'
-    ?'$ '+(n/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})
-    :Math.round(n).toLocaleString('fr-FR')+' CDF';
-}
-function renderServerHistory(){
-  const query=(activitySearch?.value||'').trim().toLowerCase();
-  const type=activityFilter?.value||'all';
-  const filtered=serverTransfers.filter(item=>{
-    const incoming=item.direction==='in';
-    return (type==='all'||(type==='in'&&incoming)||(type==='out'&&!incoming))
-      && [item.other,item.currency,item.amount_minor,incoming?'réception':'envoi'].join(' ').toLowerCase().includes(query);
-  });
-  const make=(items,limit)=>{
-    const root=document.createElement('div');
-    (typeof limit==='number'?items.slice(0,limit):items).forEach(item=>{
-      const row=document.createElement('div');row.className='history-item '+(item.direction==='in'?'incoming':'outgoing');
-      const ico=document.createElement('div');ico.className='history-icon';ico.textContent=item.direction==='in'?'↙':'↗';
-      const main=document.createElement('div');main.className='history-main';
-      const title=document.createElement('strong');title.textContent=item.direction==='in'?'Montant reçu':'Envoi';
-      const sub=document.createElement('span');sub.textContent=new Date(item.created_at).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
-      main.append(title,sub);
-      const amount=document.createElement('div');amount.className='history-amount';
-      amount.textContent=(item.direction==='in'?'+ ':'− ')+formatMinor(item.amount_minor,item.currency);
-      const status=document.createElement('small');status.textContent='Enregistré';amount.append(status);
-      row.append(ico,main,amount);root.append(row);
-    });
-    if(!root.childElementCount){const empty=document.createElement('div');empty.className='history-empty';empty.textContent='Aucune opération enregistrée.';root.append(empty);}
-    return root;
-  };
-  $('activityHistory')?.replaceChildren(make(filtered));
-  $('homeTransactions')?.replaceChildren(make(serverTransfers,4));
-}
-function renderNotifications(rows){
-  const root=$('notificationList');if(!root)return;
-  root.replaceChildren();
-  if(!rows?.length){const e=document.createElement('div');e.className='history-empty';e.textContent='Aucune notification pour le moment.';root.append(e);return;}
-  rows.forEach(n=>{
-    const row=document.createElement('div');row.className='history-item';
-    const ico=document.createElement('div');ico.className='history-icon';ico.textContent=n.is_read?'✓':'•';
-    const main=document.createElement('div');main.className='history-main';
-    const title=document.createElement('strong');title.textContent=n.title;
-    const body=document.createElement('span');body.textContent=n.body;
-    const date=document.createElement('span');date.textContent=new Date(n.created_at).toLocaleString('fr-FR',{dateStyle:'medium',timeStyle:'short'});
-    main.append(title,body,date);row.append(ico,main);
-    if(!n.is_read){
-      const mark=document.createElement('button');mark.className='text-btn';mark.type='button';mark.textContent='Lu';
-      mark.addEventListener('click',async()=>{
-        const {error}=await supabaseClient.from('teste_notifications').update({is_read:true}).eq('id',n.id);
-        if(error)toast('Impossible de mettre à jour la notification.');
-        else await refreshDemoData();
-      });
-      row.append(mark);
-    }
-    root.append(row);
-  });
-}
-async function refreshDemoData(){
-  if(!supabaseClient||!currentUserId)return;
-  try{
-    const [profileRes,walletRes,transferRes,notificationRes,cardRes]=await Promise.all([
-      supabaseClient.from('teste_profiles').select('account_id,full_name').eq('user_id',currentUserId).maybeSingle(),
-      supabaseClient.from('teste_wallets').select('currency,balance_minor').eq('user_id',currentUserId),
-      supabaseClient.from('teste_transfers').select('id,sender_id,recipient_id,sender_currency,recipient_currency,sender_amount_minor,recipient_amount_minor,created_at').or('sender_id.eq.'+currentUserId+',recipient_id.eq.'+currentUserId).order('created_at',{ascending:false}).limit(50),
-      supabaseClient.from('teste_notifications').select('id,title,body,is_read,created_at').eq('user_id',currentUserId).order('created_at',{ascending:false}).limit(30),
-      supabaseClient.from('teste_cards').select('last4,status').eq('user_id',currentUserId).maybeSingle()
-    ]);
-    for(const r of [profileRes,walletRes,transferRes,notificationRes,cardRes])if(r.error)throw r.error;
-    if(profileRes.data?.account_id){
-      demoAccountId=profileRes.data.account_id;
-      setText('profileAccountLine','Identifiant TESTE · '+demoAccountId);
-      if($('personalAccountNumber'))$('personalAccountNumber').value=demoAccountId;
-      const receiveId=$('receive')?.querySelector('.receive-code strong');if(receiveId)receiveId.textContent=demoAccountId;
-      const qr=$('receiveQr');if(qr&&window.QRCode){qr.replaceChildren();new QRCode(qr,{text:'TESTE|'+demoAccountId,width:190,height:190,colorDark:'#10251e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}
-    }
-    const usd=walletRes.data?.find(w=>w.currency==='USD')?.balance_minor??0;
-    const cdf=walletRes.data?.find(w=>w.currency==='CDF')?.balance_minor??0;
-    const total=formatMinor(usd,'USD');
-    lastBalanceText=total;
-    if($('balance'))$('balance').textContent=hidden?'••••••':total;
-    const vals=document.querySelectorAll('.currency-value');
-    if(vals[0])vals[0].textContent=formatMinor(usd,'USD');
-    if(vals[1])vals[1].textContent=formatMinor(cdf,'CDF');
-    const accountAmounts=document.querySelectorAll('#accounts .account-card strong');
-    if(accountAmounts[0])accountAmounts[0].textContent=formatMinor(usd,'USD');
-    if(accountAmounts[1])accountAmounts[1].textContent=formatMinor(cdf,'CDF');
-    document.querySelectorAll('.account-foot').forEach(el=>el.textContent='Solde du compte');
-    serverTransfers=(transferRes.data||[]).map(t=>{
-      const incoming=t.recipient_id===currentUserId;
-      return {id:t.id,direction:incoming?'in':'out',other:'Compte TESTE',currency:incoming?t.recipient_currency:t.sender_currency,amount_minor:incoming?t.recipient_amount_minor:t.sender_amount_minor,created_at:t.created_at};
-    });
-    renderServerHistory();
-    renderNotifications(notificationRes.data||[]);
-    demoCardLocked=cardRes.data?.status==='locked';
-    // Afficher l'identifiant de carte TESTE complet, sans inventer un numéro bancaire.
-    const cardReference=(demoAccountId||('TST'+currentUserId.replace(/-/g,'').slice(0,10))).toUpperCase();
-    const formattedCardReference=cardReference.match(/.{1,4}/g)?.join('  ')||cardReference;
-    setText('demoCardStatus',demoCardLocked?'VERROUILLÉE':'ACTIVE');
-    setText('demoCardStatusText',demoCardLocked?'Verrouillée':'Active');
-    setText('demoCardNumber',formattedCardReference);
-    setText('homeCardNumber',formattedCardReference);
-    setText('homeCardStatus',demoCardLocked?'VERROUILLÉE':'ACTIVE');
-    setText('toggleDemoCard',demoCardLocked?'Déverrouiller la carte':'Verrouiller la carte');
-  }catch(error){
-    console.error('TESTE data load:',error);
-    toast('Données TESTE indisponibles : vérifiez la migration SQL.');
-  }
-}
-activitySearch?.addEventListener('input',()=>{if(currentUserId)renderServerHistory();});
-activityFilter?.addEventListener('change',()=>{if(currentUserId)renderServerHistory();});
-
-const originalSendButton=$('sendTransferBtn');
-if(originalSendButton){
-  const activeSendButton=originalSendButton.cloneNode(true);
-  originalSendButton.replaceWith(activeSendButton);
-  activeSendButton.addEventListener('click',async()=>{
-    if(!currentUserId||!supabaseClient){toast('Connectez-vous pour envoyer un montant.');return;}
-    const recipient=$('recipientAccount')?.value.trim().toUpperCase()||'';
-    const amount=Number($('sendAmount')?.value||0);
-    const from=$('sendFrom')?.value||'USD';
-    const to=$('sendTo')?.value||'CDF';
-    if(!/^TST[A-Z0-9]{10}$/.test(recipient)){toast('Identifiant TESTE invalide.');return;}
-    if(!Number.isFinite(amount)||amount<=0){toast('Saisissez un montant supérieur à zéro.');return;}
-    activeSendButton.disabled=true;activeSendButton.textContent='Enregistrement…';
-    try{
-      const {data,error}=await supabaseClient.rpc('teste_demo_send',{
-        p_recipient_account:recipient,p_amount:amount,p_sender_currency:from,p_recipient_currency:to
-      });
-      if(error)throw error;
-      $('sendPreview').hidden=true;
-      toast('Transfert enregistré.');
-      await refreshDemoData();
-    }catch(error){toast(error.message||'Envoi impossible. Vérifiez le solde et l’identifiant.');}
-    finally{activeSendButton.disabled=false;activeSendButton.textContent='Envoyer';}
-  });
-}
-$('toggleDemoCard')?.addEventListener('click',async()=>{
-  if(!currentUserId||!supabaseClient){toast('Connectez-vous pour gérer la carte TESTE.');return;}
-  const button=$('toggleDemoCard');button.disabled=true;
-  try{
-    const {error}=await supabaseClient.rpc('teste_demo_toggle_card',{p_locked:!demoCardLocked});
-    if(error)throw error;
-    await refreshDemoData();toast(demoCardLocked?'Carte verrouillée.':'Carte déverrouillée.');
-  }catch(error){toast(error.message||'Action indisponible. Vérifiez la migration SQL.');}
-  finally{button.disabled=false;}
-});
-
-function startWalletRealtime(){
-  if(!supabaseClient||!currentUserId)return;
-  if(walletRefreshChannel){supabaseClient.removeChannel(walletRefreshChannel);walletRefreshChannel=null;}
-  walletRefreshChannel=supabaseClient.channel('teste-live-'+currentUserId)
-    .on('postgres_changes',{event:'*',schema:'public',table:'teste_wallets',filter:'user_id=eq.'+currentUserId},()=>refreshDemoData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'teste_notifications',filter:'user_id=eq.'+currentUserId},()=>refreshDemoData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'teste_cards',filter:'user_id=eq.'+currentUserId},()=>refreshDemoData())
-    .subscribe();
-}
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&currentUserId)refreshDemoData();
-});
-supabaseClient?.auth.onAuthStateChange(event=>{
-  if(event==='SIGNED_OUT'&&walletRefreshChannel){
-    supabaseClient.removeChannel(walletRefreshChannel);
-    walletRefreshChannel=null;
-  }
-});
+setShareCode();
